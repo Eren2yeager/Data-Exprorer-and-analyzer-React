@@ -184,7 +184,7 @@ const QueryBuilder = ({ query, sort, onQueryChange, onSortChange, onSubmit }) =>
               <div className="mt-2 text-sm text-red-600">{error}</div>
             )}
             
-            <div className="mt-4 flex justify-between items-center">
+            <div className="mt-4 flex flex-col sm:flex-row justify-start ">
               <div className="text-sm text-gray-500">
                 Build your query using MongoDB query syntax
               </div>
@@ -192,7 +192,7 @@ const QueryBuilder = ({ query, sort, onQueryChange, onSortChange, onSubmit }) =>
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                className="px-4 ml-auto mt-2 sm:mt-0 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
               >
                 Run Query
               </motion.button>

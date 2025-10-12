@@ -49,11 +49,11 @@ const Header = () => {
 
   return (
     <header className="bg-gray-800 text-white p-4 shadow-md z-20 relative">
-      <div className="container mx-auto flex justify-between items-center">
+      <div className="container  flex justify-between items-center">
         <div className="flex items-center">
           {/* Hamburger Menu Button (visible on mobile) */}
           <motion.button
-            className="mr-3 flex flex-col justify-center items-center w-8 h-8 rounded hover:bg-gray-700 focus:outline-none"
+            className="mr-3 sm:hidden flex flex-col justify-center items-center w-8 h-8 rounded hover:bg-gray-700 focus:outline-none"
             onClick={handleToggleSidebar}
             animate={isSidebarOpen ? "open" : "closed"}
             variants={hamburgerVariants}
@@ -72,15 +72,8 @@ const Header = () => {
 
           {/* Logo */}
           <div className="flex items-center space-x-2">
-            <svg 
-              className="w-8 h-8 text-green-500" 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="currentColor"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-12h2v6h-2zm0 8h2v2h-2z" />
-            </svg>
-            <h1 className="text-xl font-bold">MongoDB Data Explorer</h1>
+          <img src="/favicon.ico" alt="" onClick={() => navigate('/')} className="cursor-pointer" />
+          <h1 className="text-xl font-bold cursor-pointer" onClick={() => navigate('/')}>MongoDB Data Explorer</h1>
           </div>
         </div>
         

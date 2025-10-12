@@ -383,10 +383,10 @@ const DocumentsPage = () => {
       />
 
       {/* Action buttons */}
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col sm:justify-start sm:flex-row ">
         <div className="flex space-x-2">
           <motion.button
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.05 }} 
             whileTap={{ scale: 0.95 }}
             onClick={handleNewDocument}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -408,7 +408,7 @@ const DocumentsPage = () => {
             Refresh
           </motion.button>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-500 ml-auto">
           {totalDocs > 0 ? `${totalDocs} document${totalDocs !== 1 ? 's' : ''}` : 'No documents'}
         </div>
       </div>

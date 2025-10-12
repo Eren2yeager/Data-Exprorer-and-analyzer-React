@@ -472,8 +472,8 @@ const ConnectionPage = () => {
                         boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
                       }}
                     >
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                        <div className="mb-3 sm:mb-0">
+                      <div className="flex flex-col  justify-between items-start">
+                        <div className=" w-full mb-3 sm:mb-0">
                           {conn.isEditing ? (
                             <div className="mb-3">
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection Name</label>
@@ -526,7 +526,7 @@ const ConnectionPage = () => {
                             {formatDate(conn.timestamp)}
                           </p>
                         </div>
-                        <div className="flex space-x-2 w-full sm:w-auto mt-3 sm:mt-0">
+                        <div className="flex space-x-2 w-full sm:w-auto mt-3 ">
                           {conn.isEditing ? (
                             <>
                               <motion.button

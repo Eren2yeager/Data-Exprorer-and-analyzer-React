@@ -42,6 +42,7 @@ const SchemaPage = () => {
       const response = await schemaAPI.analyzeSchema(dbName, collName, sampleSize);
       
       if (response.data.success) {
+        {console.log(response.data.data)}
         setSchemaData(response.data.data);
       } else {
         setError(response.data.message || 'Failed to analyze schema');
@@ -124,6 +125,12 @@ const SchemaPage = () => {
   const renderField = (field, path, depth = 0) => {
     const paddingLeft = depth * 20;
     
+    // Extract field types from the API response format
+    const fieldTypes = Object.keys(field.types || {}).map(type => ({
+      name: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
+      count: field.types[type]
+    }));
+    
     return (
       <div key={path} className="mb-4">
         <div className="flex items-center justify-between mb-1">
@@ -135,7 +142,7 @@ const SchemaPage = () => {
             )}
             <span className="font-medium text-gray-800">{path.split('.').pop()}</span>
             <div className="ml-2">
-              {field.types.map((type, index) => (
+              {fieldTypes.map((type, index) => (
                 <span key={index} className="mr-1">
                   {renderTypeBadge(type.name)}
                 </span>
@@ -143,17 +150,13 @@ const SchemaPage = () => {
             </div>
           </div>
           <div className="text-sm text-gray-500">
-            {field.count} / {field.totalCount} ({Math.round(field.frequency * 100)}%)
+            {field.count} / {schemaData.sampleSize} ({Math.round(field.frequency * 100)}%)
           </div>
         </div>
         
         <div style={{ paddingLeft: `${paddingLeft + 20}px` }}>
           {renderFrequencyBar(field.frequency * 100)}
         </div>
-        
-        {field.nested && Object.keys(field.nested).map(nestedKey => 
-          renderField(field.nested[nestedKey], `${path}.${nestedKey}`, depth + 1)
-        )}
       </div>
     );
   };
@@ -243,16 +246,16 @@ const SchemaPage = () => {
               <h3 className="text-md font-medium text-gray-700 mb-2">Statistics</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-500">Total Documents</div>
-                  <div className="text-xl font-semibold">{schemaData.totalCount}</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Sample Size</div>
                   <div className="text-xl font-semibold">{schemaData.sampleSize}</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="text-sm text-gray-500">Fields</div>
-                  <div className="text-xl font-semibold">{Object.keys(schemaData.fields).length}</div>
+                  <div className="text-xl font-semibold">{Object.keys(schemaData.fieldStats || {}).length}</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-500">Schema Structure</div>
+                  <div className="text-xl font-semibold">{Object.keys(schemaData.schema || {}).length} paths</div>
                 </div>
               </div>
             </div>
@@ -265,8 +268,8 @@ const SchemaPage = () => {
                   <div className="text-sm font-medium text-gray-500">Frequency</div>
                 </div>
                 <div className="p-4">
-                  {Object.keys(schemaData.fields).map(fieldName => 
-                    renderField(schemaData.fields[fieldName], fieldName)
+                  {Object.keys(schemaData?.fieldStats || {}).map(fieldName => 
+                    renderField(schemaData?.fieldStats?.[fieldName], fieldName)
                   )}
                 </div>
               </div>

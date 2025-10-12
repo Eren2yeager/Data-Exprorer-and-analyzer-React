@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collectionAPI } from '../services/api';
-
+import useConfirmDialog from '../hooks/useConfirmDialog';
 /**
  * Collections page component
  */
@@ -18,7 +18,14 @@ const CollectionsPage = () => {
   const [newCollName, setNewCollName] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState(null);
-
+  // State for rename collection functionality
+  const [showRenameForm, setShowRenameForm] = useState(false);
+  const [collectionToRename, setCollectionToRename] = useState(null);
+  const [newRenameValue, setNewRenameValue] = useState('');
+ 
+  const {
+    confirmDeleteCollection
+  } = useConfirmDialog();
   /**
    * Load collections on component mount
    */
@@ -40,6 +47,7 @@ const CollectionsPage = () => {
       const response = await collectionAPI.listCollections(dbName);
       if (response.data.success) {
         setCollections(response.data.data || []);
+        console.log("Collections:",collections);
       } else {
         setError(response.data.message || 'Failed to load collections');
       }
@@ -88,24 +96,75 @@ const CollectionsPage = () => {
    * Handle collection deletion
    * @param {String} collName - Collection name
    */
-  const handleDropCollection = async (collName) => {
-    if (!window.confirm(`Are you sure you want to drop collection "${collName}"? This action cannot be undone.`)) {
+  const handleDeleteCollection = async (collName) => {
+
+    confirmDeleteCollection({
+      collectionName: collName,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const response = await collectionAPI.dropCollection(dbName, collName);
+          if (response.data.success) {
+            loadCollections();
+          } else {
+            setError(response.data.message || 'Failed to drop collection');
+          }
+        } catch (error) {
+          setError(error.response?.data?.message || error.message || 'Failed to drop collection');
+        } finally {
+          setLoading(false);
+        }
+      },
+      onCancel: () => console.log('Delete cancelled')
+    });
+  };
+  
+  /**
+   * Handle initiating collection rename
+   * @param {String} collName - Collection name to rename
+   */
+  const handleInitiateRename = (collName) => {
+    setCollectionToRename(collName);
+    setNewRenameValue(collName);
+    setShowRenameForm(true);
+  };
+  
+  /**
+   * Handle collection rename submission
+   * @param {Event} e - Form submit event
+   */
+  const handleRenameCollection = async (e) => {
+    e.preventDefault();
+    if (!newRenameValue.trim() || newRenameValue === collectionToRename) {
+      setShowRenameForm(false);
       return;
     }
     
     setLoading(true);
     try {
-      const response = await collectionAPI.dropCollection(dbName, collName);
+      const response = await collectionAPI.renameCollection(dbName, collectionToRename, newRenameValue);
       if (response.data.success) {
+        setShowRenameForm(false);
+        setCollectionToRename(null);
+        setNewRenameValue('');
         loadCollections();
       } else {
-        setError(response.data.message || 'Failed to drop collection');
+        setError(response.data.message || 'Failed to rename collection');
       }
     } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Failed to drop collection');
+      setError(error.response?.data?.message || error.message || 'Failed to rename collection');
     } finally {
       setLoading(false);
     }
+  };
+  
+  /**
+   * Cancel rename operation
+   */
+  const handleCancelRename = () => {
+    setShowRenameForm(false);
+    setCollectionToRename(null);
+    setNewRenameValue('');
   };
 
   /**
@@ -133,7 +192,7 @@ const CollectionsPage = () => {
       </div>
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Collections</h2>
+        <h2 className="text-xl font-semibold">Collections ({collections.length})</h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -170,6 +229,41 @@ const CollectionsPage = () => {
               >
                 Create
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+      
+      {/* Rename collection form */}
+      {showRenameForm && (
+        <div className="mb-6 p-4 bg-white rounded-lg shadow-md">
+          <h3 className="text-lg font-semibold mb-3">Rename Collection: {collectionToRename}</h3>
+          <form onSubmit={handleRenameCollection}>
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0">
+              <input
+                type="text"
+                value={newRenameValue}
+                onChange={(e) => setNewRenameValue(e.target.value)}
+                placeholder="New collection name"
+                className="w-full sm:flex-1 px-3 py-2 border border-gray-300 rounded sm:rounded-l sm:rounded-r-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              <div className="flex sm:flex-none">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded sm:rounded-l-none sm:rounded-r hover:bg-blue-700 disabled:bg-blue-400"
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelRename}
+                  className="ml-2 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -218,7 +312,17 @@ const CollectionsPage = () => {
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDropCollection(collection.name)}
+                    onClick={() => handleInitiateRename(collection.name)}
+                    className="mr-2 p-2 text-green-600 hover:bg-green-100 rounded flex items-center justify-center"
+                    title="Rename Collection"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-5 md:w-5 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                   
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCollection(collection.name)}
                     className="p-2 text-red-600 hover:bg-red-100 rounded"
                     title="Drop Collection"
                   >

@@ -7,6 +7,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { databaseAPI, collectionAPI } from '../../services/api';
+import { useSidebar } from '../../../Contexts/sidebar-context';
 
 /**
  * MainLayout component that provides the application structure
@@ -17,15 +18,15 @@ const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Get sidebar state from context
+  const { isSidebarOpen } = useSidebar();
+  
   // Application state
   const [databases, setDatabases] = useState([]);
   const [collections, setCollections] = useState([]);
   const [selectedDb, setSelectedDb] = useState(null);
   const [selectedColl, setSelectedColl] = useState(null);
   const [loading, setLoading] = useState(false);
-  
-  // State for sidebar visibility on mobile
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   /**
    * Extract database and collection from URL path
@@ -116,21 +117,24 @@ const MainLayout = () => {
   /**
    * Handle collection selection
    * @param {String} collName - Collection name
+   * @param {String} dbName - Optional database name, used when selecting from a different database
    */
-  const handleSelectCollection = (collName) => {
+  const handleSelectCollection = (collName, dbName) => {
+    // If dbName is provided and different from selectedDb, use it instead
+    const targetDb = dbName && dbName !== selectedDb ? dbName : selectedDb;
     setSelectedColl(collName);
-    navigate(`/databases/${selectedDb}/collections/${collName}/documents`);
+    navigate(`/databases/${targetDb}/collections/${collName}/documents`);
   };
 
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Header */}
-      <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <Header />
 
       {/* Main content area with sidebar */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - hidden on mobile unless toggled */}
-        <div className={`${sidebarOpen ? 'block' : 'hidden'} md:block w-64 border-r`}>
+        {/* Sidebar - controlled by sidebar context */}
+        <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block z-20`}>
           <Sidebar
             databases={databases}
             selectedDb={selectedDb}
@@ -138,6 +142,7 @@ const MainLayout = () => {
             selectedColl={selectedColl}
             onSelectDatabase={handleSelectDatabase}
             onSelectCollection={handleSelectCollection}
+            onGetCollections={loadCollections}
             loading={loading}
           />
         </div>

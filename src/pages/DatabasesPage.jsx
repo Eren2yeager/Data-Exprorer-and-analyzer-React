@@ -2,10 +2,10 @@
  * DatabasesPage Component
  * Page for displaying and managing MongoDB databases
  */
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { databaseAPI } from '../services/api';
-
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { databaseAPI } from "../services/api";
+import useConfirmDialog from "../hooks/useConfirmDialog";
 /**
  * Database explorer page component
  */
@@ -15,25 +15,26 @@ const DatabasesPage = () => {
   const [databases, setDatabases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newDbName, setNewDbName] = useState('');
+  const [newDbName, setNewDbName] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedDb, setSelectedDb] = useState(null);
-
+  const { confirmDropDatabase } = useConfirmDialog();
   // Get connection string from location state or localStorage
-  const connStr = location.state?.connStr || localStorage.getItem('currentConnStr');
+  const connStr =
+    location.state?.connStr || localStorage.getItem("currentConnStr");
 
   /**
    * Load databases on component mount
    */
   useEffect(() => {
     if (!connStr) {
-      navigate('/');
+      navigate("/");
       return;
     }
-    
+
     // Store current connection string in localStorage
-    localStorage.setItem('currentConnStr', connStr);
-    
+    localStorage.setItem("currentConnStr", connStr);
+
     loadDatabases();
   }, [connStr, navigate]);
 
@@ -47,10 +48,14 @@ const DatabasesPage = () => {
       if (response.data.success) {
         setDatabases(response.data.data || []);
       } else {
-        setError(response.data.message || 'Failed to load databases');
+        setError(response.data.message || "Failed to load databases");
       }
     } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Failed to load databases');
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to load databases"
+      );
     } finally {
       setLoading(false);
     }
@@ -72,19 +77,23 @@ const DatabasesPage = () => {
   const handleCreateDatabase = async (e) => {
     e.preventDefault();
     if (!newDbName.trim()) return;
-    
+
     setLoading(true);
     try {
-      const response = await databaseAPI.createDatabase( newDbName);
+      const response = await databaseAPI.createDatabase(newDbName);
       if (response.data.success) {
-        setNewDbName('');
+        setNewDbName("");
         setShowCreateForm(false);
         loadDatabases();
       } else {
-        setError(response.data.message || 'Failed to create database');
+        setError(response.data.message || "Failed to create database");
       }
     } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Failed to create database');
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to create database"
+      );
     } finally {
       setLoading(false);
     }
@@ -95,34 +104,40 @@ const DatabasesPage = () => {
    * @param {String} dbName - Database name
    */
   const handleDropDatabase = async (dbName) => {
-    if (!window.confirm(`Are you sure you want to drop database "${dbName}"? This action cannot be undone.`)) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await databaseAPI.dropDatabase(connStr, dbName);
-      if (response.data.success) {
-        loadDatabases();
-      } else {
-        setError(response.data.message || 'Failed to drop database');
-      }
-    } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Failed to drop database');
-    } finally {
-      setLoading(false);
-    }
+    confirmDropDatabase({
+      databaseName: dbName,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const response = await databaseAPI.dropDatabase(dbName);
+          if (response.data.success) {
+            loadDatabases();
+          } else {
+            setError(response.data.message || "Failed to drop database");
+          }
+        } catch (error) {
+          setError(
+            error.response?.data?.message ||
+              error.message ||
+              "Failed to drop database"
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      onCancel: () => console.log("Drop cancelled"),
+    });
   };
 
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Databases</h1>
+        <h1 className="text-2xl font-bold">Databases ({databases.length})</h1>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          {showCreateForm ? 'Cancel' : 'Create Database'}
+          {showCreateForm ? "Cancel" : "Create Database"}
         </button>
       </div>
 
@@ -156,7 +171,8 @@ const DatabasesPage = () => {
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Note: In MongoDB, a database is not actually created until data is inserted into it.
+              Note: In MongoDB, a database is not actually created until data is
+              inserted into it.
             </p>
           </form>
         </div>
@@ -177,20 +193,22 @@ const DatabasesPage = () => {
             <div
               key={db.name}
               className={`bg-white p-4 rounded-lg shadow-md border-l-4 ${
-                selectedDb === db.name ? 'border-blue-500' : 'border-transparent'
+                selectedDb === db.name
+                  ? "border-blue-500"
+                  : "border-transparent"
               } hover:border-blue-300 transition-colors`}
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 
+                  <h2
                     className="text-lg font-semibold mb-2 cursor-pointer hover:text-blue-600"
                     onClick={() => handleSelectDatabase(db.name)}
                   >
                     {db.name}
                   </h2>
                   <div className="text-sm text-gray-500">
-                    <p>Collections: {db.collections || 0}</p>
-           
+                    <p>Collections: {db.collections.length || 0}</p>
+
                     <p>Size: {formatSize(db.sizeOnDisk || 0)}</p>
                   </div>
                 </div>
@@ -200,20 +218,38 @@ const DatabasesPage = () => {
                     className="mr-2 p-2 text-blue-600 hover:bg-blue-100 rounded"
                     title="View Collections"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
                       <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </button>
                   {/* Don't allow dropping system databases */}
-                  {!['admin', 'local', 'config'].includes(db.name) && (
+                  {!["admin", "local", "config"].includes(db.name) && (
                     <button
                       onClick={() => handleDropDatabase(db.name)}
                       className="p-2 text-red-600 hover:bg-red-100 rounded"
                       title="Drop Database"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     </button>
                   )}
@@ -233,13 +269,13 @@ const DatabasesPage = () => {
  * @returns {String} Formatted size string
  */
 const formatSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  
+  if (bytes === 0) return "0 Bytes";
+
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
 export default DatabasesPage;

@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { schemaAPI } from '../services/api';
-
+import TabNavigation from '../components/navigation/TabNavigation';
 /**
  * Schema page component
  */
@@ -162,7 +162,11 @@ const SchemaPage = () => {
   };
 
   return (
-    <div className="container mx-auto">
+    <div className="container mx-auto px-4 py-6 max-w-7xl">
+          {/* Navigation and Header */}
+      <div className="mb-6">
+        <TabNavigation dbName={dbName} collName={collName} />
+      </div>
       {/* Header with collection info */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
@@ -177,12 +181,12 @@ const SchemaPage = () => {
       <div className="bg-white rounded-lg shadow mb-6 p-4">
         <div className="flex flex-wrap items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button
+            {/* <button
               onClick={handleBackToDocuments}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               Back to Documents
-            </button>
+            </button> */}
             
             <div className="flex items-center">
               <label htmlFor="sampleSize" className="mr-2 text-sm font-medium text-gray-700">

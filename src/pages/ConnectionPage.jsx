@@ -1,8 +1,8 @@
 /**
  * ConnectionPage Component
- * Page for managing MongoDB connections with responsive design
+ * Page for managing MongoDB connections
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConnectionForm from '../components/connection/ConnectionForm';
 import { connectionAPI } from '../services/api';
@@ -38,14 +38,25 @@ const ConnectionPage = () => {
   }, [error, success]);
 
   /**
-   * Load active connections from the API
+   * Load active connections from the API and localStorage
    */
   const loadConnections = async () => {
     setLoading(true);
     try {
+      // Get active connections from API
       const response = await connectionAPI.getConnections();
       if (response.data.success) {
         setConnections(response.data.data || []);
+      }
+      
+      // Also check localStorage for active connections
+      const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+      const activeConn = savedConnections.find(conn => conn.active === true);
+      if (activeConn && !connections.some(conn => conn.connStr === activeConn.connStr)) {
+        setConnections(prev => [...prev, { 
+          connStr: activeConn.connStr,
+          name: activeConn.name
+        }]);
       }
     } catch (error) {
       console.error('Failed to load connections:', error);
@@ -66,16 +77,31 @@ const ConnectionPage = () => {
     
     // Store connection in local storage for persistence
     const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+    
+    // Set all connections to inactive first
+    savedConnections.forEach(conn => conn.active = false);
+    
     const existingIndex = savedConnections.findIndex(conn => conn.connStr === connStr);
     
     if (existingIndex >= 0) {
-      savedConnections[existingIndex] = { connStr, name, timestamp: Date.now() };
+      savedConnections[existingIndex] = { 
+        connStr, 
+        name, 
+        timestamp: Date.now(),
+        active: true 
+      };
     } else {
-      savedConnections.push({ connStr, name, timestamp: Date.now() });
+      savedConnections.push({ 
+        connStr, 
+        name, 
+        timestamp: Date.now(),
+        active: true 
+      });
     }
     
     localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
     forceUpdate();
+    loadConnections(); // Reload connections to update active connections list
     
     // Navigate to database list
     setTimeout(() => {
@@ -448,18 +474,51 @@ const ConnectionPage = () => {
                     >
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                         <div className="mb-3 sm:mb-0">
-                          <h3 className="font-medium text-gray-900 dark:text-white text-lg flex items-center">
-                            <svg className="h-5 w-5 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                            </svg>
-                            {conn.name}
-                          </h3>
-                          <div className="mt-2 flex items-center bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-1.5">
-                            <svg className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[200px] sm:max-w-xs">{conn.connStr}</p>
-                          </div>
+                          {conn.isEditing ? (
+                            <div className="mb-3">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection Name</label>
+                              <input 
+                                type="text" 
+                                value={conn.editName || conn.name} 
+                                onChange={(e) => {
+                                  const updatedConnections = [...savedConnectionsList];
+                                  updatedConnections[index] = { ...conn, editName: e.target.value };
+                                  setSavedConnectionsList(updatedConnections);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <h3 className="font-medium text-gray-900 dark:text-white text-lg flex items-center">
+                              <svg className="h-5 w-5 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                              </svg>
+                              {conn.name}
+                            </h3>
+                          )}
+                          
+                          {conn.isEditing ? (
+                            <div className="mb-3">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection String</label>
+                              <input 
+                                type="text" 
+                                value={conn.editConnStr || conn.connStr} 
+                                onChange={(e) => {
+                                  const updatedConnections = [...savedConnectionsList];
+                                  updatedConnections[index] = { ...conn, editConnStr: e.target.value };
+                                  setSavedConnectionsList(updatedConnections);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <div className="mt-2 flex items-center bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-1.5">
+                              <svg className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                              <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[200px] sm:max-w-xs">{conn.connStr}</p>
+                            </div>
+                          )}
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center">
                             <svg className="h-3.5 w-3.5 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -468,37 +527,98 @@ const ConnectionPage = () => {
                           </p>
                         </div>
                         <div className="flex space-x-2 w-full sm:w-auto mt-3 sm:mt-0">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => connectToSaved(conn)}
-                            disabled={loading}
-                            className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-medium shadow-sm transition-all duration-200 flex items-center justify-center"
-                          >
-                            {loading ? (
-                              <svg className="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            ) : (
-                              <>
+                          {conn.isEditing ? (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  const updatedConnections = [...savedConnectionsList];
+                                  updatedConnections[index] = { 
+                                    ...conn, 
+                                    name: conn.editName || conn.name,
+                                    connStr: conn.editConnStr || conn.connStr,
+                                    isEditing: false 
+                                  };
+                                  setSavedConnectionsList(updatedConnections);
+                                  localStorage.setItem('mongoConnections', JSON.stringify(updatedConnections));
+                                }}
+                                className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm font-medium shadow-sm transition-all duration-200 flex items-center justify-center"
+                              >
                                 <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                 </svg>
-                                <span>Connect</span>
-                              </>
-                            )}
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setDeleteConfirm(index)}
-                            className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200"
-                          >
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </motion.button>
+                                <span>Save</span>
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  const updatedConnections = [...savedConnectionsList];
+                                  updatedConnections[index] = { ...conn, isEditing: false };
+                                  setSavedConnectionsList(updatedConnections);
+                                }}
+                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200"
+                              >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </motion.button>
+                            </>
+                          ) : (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => connectToSaved(conn)}
+                                disabled={loading}
+                                className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-medium shadow-sm transition-all duration-200 flex items-center justify-center"
+                              >
+                                {loading ? (
+                                  <svg className="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  <>
+                                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span>Connect</span>
+                                  </>
+                                )}
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  const updatedConnections = [...savedConnectionsList];
+                                  updatedConnections[index] = { 
+                                    ...conn, 
+                                    isEditing: true,
+                                    editName: conn.name,
+                                    editConnStr: conn.connStr
+                                  };
+                                  setSavedConnectionsList(updatedConnections);
+                                }}
+                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200 flex items-center justify-center"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setDeleteConfirm(index)}
+                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200"
+                              >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </motion.button>
+                            </>
+                          )}
                         </div>
                       </div>
                       

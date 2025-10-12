@@ -27,6 +27,7 @@ const MainLayout = () => {
   const [selectedDb, setSelectedDb] = useState(null);
   const [selectedColl, setSelectedColl] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [connectionName, setConnectionName] = useState("");
 
   /**
    * Extract database and collection from URL path
@@ -53,9 +54,17 @@ const MainLayout = () => {
   }, [location.pathname]);
 
   /**
-   * Load databases when component mounts
+   * Load connection info when component mounts
    */
   useEffect(() => {
+    // Get connection info from localStorage
+    const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+    const activeConnection = savedConnections.find(conn => conn.active === true);
+    if (activeConnection) {
+      setConnectionName(activeConnection.name);
+    }
+    
+    // Load databases
     loadDatabases();
   }, []);
 
@@ -144,6 +153,7 @@ const MainLayout = () => {
             onSelectCollection={handleSelectCollection}
             onGetCollections={loadCollections}
             loading={loading}
+            connectionName={connectionName}
           />
         </div>
 

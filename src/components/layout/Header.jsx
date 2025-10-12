@@ -84,56 +84,12 @@ const Header = () => {
           </div>
         </div>
         
-        {/* Navigation - Hide on small screens */}
-        <nav className="hidden md:block">
-          <ul className="flex space-x-4">
-            <li>
-              <button 
-                className="hover:text-green-400 transition-colors"
-                onClick={() => navigate('/')}
-              >
-                Connections
-              </button>
-            </li>
-            <li>
-              <button 
-                className="hover:text-green-400 transition-colors"
-                onClick={() => navigate('/settings')}
-              >
-                Settings
-              </button>
-            </li>
-            <li>
-              <button 
-                className="hover:text-green-400 transition-colors"
-                onClick={() => window.open('https://github.com/yourusername/mongodb-data-explorer/wiki', '_blank')}
-              >
-                Help
-              </button>
-            </li>
-          </ul>
-        </nav>
+        {/* Right side of header - can be used for user profile, etc. */}
+        <div className="hidden md:flex items-center">
+          {/* You can add user profile, theme toggle, etc. here */}
+        </div>
 
-        {/* Mobile Menu Button (only visible on small screens) */}
-        <button 
-          className="md:hidden rounded-md p-2 hover:bg-gray-700 focus:outline-none"
-          aria-label="Open menu"
-        >
-          <svg 
-            className="w-6 h-6" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24" 
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth="2" 
-              d="M4 6h16M4 12h16m-7 6h7" 
-            />
-          </svg>
-        </button>
+   
       </div>
     </header>
   );

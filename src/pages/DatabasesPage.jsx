@@ -39,10 +39,10 @@ const DatabasesPage = () => {
    * Load databases on component mount
    */
   useEffect(() => {
-    if (!connStr) {
-      navigate("/");
-      return;
-    }
+    // if (!connStr) {
+    //   navigate("/");
+    //   return;
+    // }
 
     // Store current connection string in localStorage
     localStorage.setItem("currentConnStr", connStr);

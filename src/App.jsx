@@ -3,7 +3,7 @@
  * Provides routing and layout for the application
  */
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useToast } from '../Contexts/toast-Contex';
 import { ConnectionProvider } from '../Contexts/connection-context';
 
@@ -17,6 +17,7 @@ import CollectionsPage from './pages/CollectionsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import SchemaPage from './pages/SchemaPage';
 import IndexesPage from './pages/IndexesPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 // Protected route component
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -51,8 +52,8 @@ function App() {
             </Route>
           </Route>
           
-          {/* Redirect any other paths to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Show NotFoundPage for unrecognized routes - Must be outside ProtectedRoute */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Router>
     </ConnectionProvider>

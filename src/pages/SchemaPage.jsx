@@ -1,11 +1,23 @@
 /**
  * SchemaPage Component
  * Page for analyzing and visualizing the schema of a MongoDB collection
+ * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { schemaAPI } from '../services/api';
 import TabNavigation from '../components/navigation/TabNavigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 /**
  * Schema page component
  */

@@ -1,16 +1,27 @@
 /**
  * ConnectionPage Component
- * Page for managing MongoDB connections
+ * Page for managing MongoDB connections with responsive design
+ * and enhanced visual elements
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConnectionForm from '../components/connection/ConnectionForm';
 import { connectionAPI } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useConnection } from '../../Contexts/connection-context';
+// Import responsive utilities
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 
-/**
- * Connection management page
- */
+
 const ConnectionPage = () => {
   const navigate = useNavigate();
   const [connections, setConnections] = useState([]);
@@ -19,6 +30,15 @@ const ConnectionPage = () => {
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [activeTab, setActiveTab] = useState('new'); // 'new' or 'saved'
+  const { setConnection } = useConnection();
+  
+  // Use reducer for forcing update
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+  
+  // Load saved connections from local storage
+  const [savedConnectionsList, setSavedConnectionsList] = useState(
+    JSON.parse(localStorage.getItem('mongoConnections') || '[]')
+  );
 
   /**
    * Load saved connections on component mount
@@ -58,6 +78,9 @@ const ConnectionPage = () => {
           name: activeConn.name
         }]);
       }
+      
+      // Update saved connections list
+      setSavedConnectionsList(savedConnections);
     } catch (error) {
       console.error('Failed to load connections:', error);
     } finally {
@@ -83,30 +106,30 @@ const ConnectionPage = () => {
     
     const existingIndex = savedConnections.findIndex(conn => conn.connStr === connStr);
     
+    const connectionData = { 
+      connStr, 
+      name, 
+      timestamp: Date.now(),
+      active: true 
+    };
+    
     if (existingIndex >= 0) {
-      savedConnections[existingIndex] = { 
-        connStr, 
-        name, 
-        timestamp: Date.now(),
-        active: true 
-      };
+      savedConnections[existingIndex] = connectionData;
     } else {
-      savedConnections.push({ 
-        connStr, 
-        name, 
-        timestamp: Date.now(),
-        active: true 
-      });
+      savedConnections.push(connectionData);
     }
     
+    // Save to localStorage
     localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
-    forceUpdate();
-    loadConnections(); // Reload connections to update active connections list
     
-    // Navigate to database list
-    setTimeout(() => {
-      navigate('/databases', { state: { connStr } });
-    }, 1000);
+    // Update saved connections list
+    setSavedConnectionsList(savedConnections);
+    
+    // Update connection context
+    setConnection(connectionData);
+    
+    // Navigate to databases page
+    navigate('/databases');
   };
 
   /**
@@ -178,21 +201,12 @@ const ConnectionPage = () => {
     savedConnections.splice(index, 1);
     localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
     setDeleteConfirm(null);
-    // Force re-render
+    // Update saved connections list
+    setSavedConnectionsList(savedConnections);
     forceUpdate();
   };
-
-  /**
-   * Force component update
-   */
-  const forceUpdate = () => {
-    setSavedConnectionsList(JSON.parse(localStorage.getItem('mongoConnections') || '[]'));
-  };
-
-  // Load saved connections from local storage
-  const [savedConnectionsList, setSavedConnectionsList] = useState(
-    JSON.parse(localStorage.getItem('mongoConnections') || '[]')
-  );
+  //   JSON.parse(localStorage.getItem('mongoConnections') || '[]')
+  // );
 
   // Animation variants
   const containerVariants = {
@@ -241,105 +255,30 @@ const ConnectionPage = () => {
   };
 
   return (
-    <motion.div 
-      initial="initial"
-      animate="in"
-      exit="out"
-      variants={pageVariants}
-      transition={pageTransition}
-      className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-8 px-4 sm:px-6"
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* Header with animated gradient text */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="text-center mb-10"
-        >
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-              MongoDB Connection
-            </span>
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Connect to your MongoDB instances and explore your data with ease
-          </p>
-        </motion.div>
+    <ResponsivePageContainer>
+      {/* Header with animated gradient text */}
+      <PageHeader 
+        title="MongoDB Connection"
+        subtitle="Connect to your MongoDB instances and explore your data with ease"
+      />
         
         {/* Error/Success messages */}
-        <div className="fixed top-4 right-4 z-50 w-full max-w-sm">
+        <div className="fixed top-4 right-4 z-50 w-full max-w-sm sm:max-w-md">
           <AnimatePresence>
             {error && (
-              <motion.div 
-                key="error"
-                variants={notificationVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg shadow-lg"
-              >
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
-                  </div>
-                  <button 
-                    onClick={() => setError(null)}
-                    className="ml-auto flex-shrink-0 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <motion.div 
-                  initial={{ width: '100%' }}
-                  animate={{ width: '0%' }}
-                  transition={{ duration: 5 }}
-                  className="h-1 bg-red-300 dark:bg-red-700 mt-2 rounded-full"
-                />
-              </motion.div>
+              <Notification 
+                type="error" 
+                message={error} 
+                onDismiss={() => setError(null)} 
+              />            
             )}
             
             {success && (
-              <motion.div 
-                key="success"
-                variants={notificationVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="mb-4 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg shadow-lg"
-              >
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-green-800 dark:text-green-200">{success}</p>
-                  </div>
-                  <button 
-                    onClick={() => setSuccess(null)}
-                    className="ml-auto flex-shrink-0 text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <motion.div 
-                  initial={{ width: '100%' }}
-                  animate={{ width: '0%' }}
-                  transition={{ duration: 5 }}
-                  className="h-1 bg-green-300 dark:bg-green-700 mt-2 rounded-full"
-                />
-              </motion.div>
+              <Notification 
+                type="success" 
+                message={success} 
+                onDismiss={() => setSuccess(null)} 
+              />
             )}
           </AnimatePresence>
         </div>
@@ -708,9 +647,9 @@ const ConnectionPage = () => {
           <p>MongoDB Data Explorer and Analyzer</p>
           <p className="mt-1">Connect, explore, and analyze your MongoDB data with ease</p>
         </motion.div>
-      </div>
-    </motion.div>
+    </ResponsivePageContainer>
   );
 };
+
 
 export default ConnectionPage;

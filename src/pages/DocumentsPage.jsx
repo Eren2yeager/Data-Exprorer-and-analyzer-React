@@ -1,12 +1,23 @@
 /**
  * DocumentsPage Component
  * Page for displaying and managing documents within a MongoDB collection
+ * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { documentAPI } from '../services/api';
 import useConfirmDialog from '../hooks/useConfirmDialog';
 import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 
 // Import custom components
 import TabNavigation from '../components/navigation/TabNavigation';

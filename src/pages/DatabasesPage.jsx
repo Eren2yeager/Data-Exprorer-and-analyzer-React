@@ -1,11 +1,23 @@
 /**
  * DatabasesPage Component
  * Page for displaying and managing MongoDB databases
+ * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { databaseAPI } from "../services/api";
 import useConfirmDialog from "../hooks/useConfirmDialog";
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 /**
  * Database explorer page component
  */

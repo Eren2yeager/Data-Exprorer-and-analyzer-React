@@ -1,6 +1,7 @@
 /**
  * IndexesPage Component
  * Page for managing MongoDB collection indexes
+ * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
@@ -8,6 +9,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { schemaAPI } from '../services/api';
 import TabNavigation from '../components/navigation/TabNavigation';
 import useConfirmDialog from '../hooks/useConfirmDialog';
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 import { useNavigate } from 'react-router-dom';
 
 

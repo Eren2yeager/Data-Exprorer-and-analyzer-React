@@ -5,6 +5,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useToast } from '../Contexts/toast-Contex';
+import { ConnectionProvider } from '../Contexts/connection-context';
 
 // Layout components
 import MainLayout from './components/layout/MainLayout';
@@ -17,36 +18,44 @@ import DocumentsPage from './pages/DocumentsPage';
 import SchemaPage from './pages/SchemaPage';
 import IndexesPage from './pages/IndexesPage';
 
+// Protected route component
+import ProtectedRoute from './components/common/ProtectedRoute';
+
 /**
  * Main application component
- * Sets up routing and layout structure
+ * Sets up routing and layout structure with protected routes
  */
 function App() {
   // Get toast functions from context
   const { showSuccess, showError, showInfo } = useToast();
 
   return (
-    <Router>
-      <Routes>
-        {/* Connection page (outside main layout) */}
-        <Route path="/" element={<ConnectionPage />} />
-        
-        {/* Routes with main layout */}
-        <Route path="/" element={<MainLayout />}>
-          {/* Database routes */}
-          <Route path="/databases" element={<DatabasesPage />} />
-          <Route path="/databases/:dbName/collections" element={<CollectionsPage />} />
+    <ConnectionProvider>
+      <Router>
+        <Routes>
+          {/* Connection page (outside main layout) */}
+          <Route path="/" element={<ConnectionPage />} />
           
-          {/* Collection routes */}
-          <Route path="/databases/:dbName/collections/:collName/documents" element={<DocumentsPage />} />
-          <Route path="/databases/:dbName/collections/:collName/schema" element={<SchemaPage />} />
-          <Route path="/databases/:dbName/collections/:collName/indexes" element={<IndexesPage />} />
+          {/* Protected routes that require database connection */}
+          <Route element={<ProtectedRoute />}>
+            {/* Routes with main layout */}
+            <Route element={<MainLayout />}>
+              {/* Database routes */}
+              <Route path="/databases" element={<DatabasesPage />} />
+              <Route path="/databases/:dbName/collections" element={<CollectionsPage />} />
+              
+              {/* Collection routes */}
+              <Route path="/databases/:dbName/collections/:collName/documents" element={<DocumentsPage />} />
+              <Route path="/databases/:dbName/collections/:collName/schema" element={<SchemaPage />} />
+              <Route path="/databases/:dbName/collections/:collName/indexes" element={<IndexesPage />} />
+            </Route>
+          </Route>
           
           {/* Redirect any other paths to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </ConnectionProvider>
   );
 }
 

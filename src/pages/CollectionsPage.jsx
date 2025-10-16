@@ -1,11 +1,23 @@
 /**
  * CollectionsPage Component
  * Page for displaying and managing collections within a MongoDB database
+ * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collectionAPI } from '../services/api';
 import useConfirmDialog from '../hooks/useConfirmDialog';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ResponsivePageContainer, 
+  PageHeader, 
+  ResponsiveCard, 
+  ResponsiveGrid,
+  Notification,
+  GradientButton,
+  Icons,
+  animationVariants
+} from '../components/common/ResponsiveUtils';
 /**
  * Collections page component
  */

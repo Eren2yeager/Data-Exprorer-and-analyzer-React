@@ -4,8 +4,7 @@
  * Enhanced with responsive design and visual improvements
  */
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useParams, useNavigate } from 'react-router-dom';
 import { schemaAPI } from '../services/api';
 import TabNavigation from '../components/navigation/TabNavigation';
 import useConfirmDialog from '../hooks/useConfirmDialog';
@@ -16,10 +15,9 @@ import {
   ResponsiveGrid,
   Notification,
   GradientButton,
-  Icons,
-  animationVariants
+  Icons
 } from '../components/common/ResponsiveUtils';
-import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 
 /**
@@ -60,7 +58,7 @@ const IndexesPage = () => {
     }
     
     loadIndexes();
-  }, [dbName, collName, navigate]);
+  }, [dbName, collName, navigate, loadIndexes]);
 
   /**
    * Load indexes from API

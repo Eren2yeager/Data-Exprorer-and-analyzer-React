@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 /**
  * ConfirmContext - A context for managing confirmation dialogs throughout the application

@@ -27,8 +27,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
  * Sets up routing and layout structure with protected routes
  */
 function App() {
-  // Get toast functions from context
-  const { showSuccess, showError, showInfo } = useToast();
+  // Toast context is used in child components
+  useToast();
 
   return (
     <ConnectionProvider>

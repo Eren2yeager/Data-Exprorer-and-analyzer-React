@@ -24,10 +24,10 @@ const ProtectedRoute = () => {
     );
   }
   
-  // // Redirect to connection page if not connected
-  // if (!isConnected) {
-  //   return <Navigate to="/" replace />;
-  // }
+  // Redirect to connection page if not connected
+  if (!isConnected) {
+    return <Navigate to="/" replace />;
+  }
   
   // Render child routes if connected
   return <Outlet />;

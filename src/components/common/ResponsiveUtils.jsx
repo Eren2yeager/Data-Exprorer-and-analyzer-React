@@ -3,11 +3,10 @@
  * Reusable responsive components and styles for consistent UI across the application
  */
 import React from 'react';
-import { motion } from 'framer-motion';
 import { FiDatabase, FiServer, FiAlertCircle, FiCheckCircle, FiX, 
          FiTrash2, FiPlus, FiClock, FiRefreshCw, FiList, FiGrid, 
          FiSearch, FiFilter, FiEdit, FiInfo, FiSettings } from 'react-icons/fi';
-
+import { motion } from 'framer-motion';
 /**
  * Page container with responsive padding and animations
  */

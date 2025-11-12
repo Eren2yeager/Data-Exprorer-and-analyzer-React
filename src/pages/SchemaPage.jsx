@@ -7,17 +7,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { schemaAPI } from '../services/api';
 import TabNavigation from '../components/navigation/TabNavigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ResponsivePageContainer, 
-  PageHeader, 
-  ResponsiveCard, 
-  ResponsiveGrid,
-  Notification,
-  GradientButton,
-  Icons,
-  animationVariants
-} from '../components/common/ResponsiveUtils';
+import { useConnection } from '../../Contexts/connection-context';
+import { useToast } from '../../Contexts/toast-Contex';
+import { FiArrowLeft } from 'react-icons/fi';
 /**
  * Schema page component
  */
@@ -41,7 +33,7 @@ const SchemaPage = () => {
     }
     
     loadSchemaData();
-  }, [dbName, collName, sampleSize, navigate]);
+  }, [dbName, collName, sampleSize, navigate, loadSchemaData]);
 
   /**
    * Load schema data from API

@@ -1,97 +1,166 @@
 /**
  * ConnectionContext
- * Provides global state for MongoDB connection status
+ * Provides global state for MongoDB connection status using session-based authentication
  */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { connectionAPI } from '../src/services/api';
 
-// Create context
 const ConnectionContext = createContext();
 
-/**
- * ConnectionProvider component
- * Manages connection state and provides methods to check, set and clear connection status
- */
 export const ConnectionProvider = ({ children }) => {
-  // State to track if database is connected
   const [isConnected, setIsConnected] = useState(false);
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionId, setSessionId] = useState(null);
 
-  // Check connection status on mount
   useEffect(() => {
     checkConnectionStatus();
   }, []);
 
-  /**
-   * Check if there's an active database connection
-   */
   const checkConnectionStatus = async () => {
     setLoading(true);
     try {
-      // Check localStorage for active connection
-      const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-      const activeConn = savedConnections.find(conn => conn.active === true);
+      const storedSessionId = localStorage.getItem('mongoSessionId');
+      const storedConnInfo = localStorage.getItem('connectionInfo');
       
-      if (activeConn) {
-        // Verify connection is still valid with backend
+      if (storedSessionId && storedConnInfo) {
         try {
-          const response = await connectionAPI.testConnection(activeConn.connStr);
+          const response = await connectionAPI.getSessions();
           if (response.data.success) {
             setIsConnected(true);
-            setConnectionInfo(activeConn);
+            setSessionId(storedSessionId);
+            setConnectionInfo(JSON.parse(storedConnInfo));
           } else {
-            setIsConnected(false);
-            setConnectionInfo(null);
+            clearConnection();
           }
         } catch (error) {
-          console.error('Connection verification failed:', error);
-          setIsConnected(false);
-          setConnectionInfo(null);
+          console.log('Session validation failed:', error.message);
+          clearConnection();
         }
       } else {
         setIsConnected(false);
+        setSessionId(null);
         setConnectionInfo(null);
       }
     } catch (error) {
       console.error('Failed to check connection status:', error);
       setIsConnected(false);
+      setSessionId(null);
       setConnectionInfo(null);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Set active connection
-   * @param {Object} connectionData - Connection information
-   */
-  const setConnection = (connectionData) => {
-    setIsConnected(true);
-    setConnectionInfo(connectionData);
+  const connect = async (connStr, name = 'MongoDB Connection') => {
+    try {
+      const response = await connectionAPI.connect(connStr);
+      
+      if (response.data.success) {
+        const newSessionId = response.data.data.sessionId;
+        const connInfo = {
+          name,
+          connStr,
+          serverInfo: response.data.data.serverInfo,
+          connectedAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('mongoSessionId', newSessionId);
+        localStorage.setItem('connectionInfo', JSON.stringify(connInfo));
+
+        setSessionId(newSessionId);
+        setConnectionInfo(connInfo);
+        setIsConnected(true);
+
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.message };
+      }
+    } catch (error) {
+      console.error('Connection failed:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || error.message || 'Connection failed' 
+      };
+    }
   };
 
-  /**
-   * Clear active connection
-   */
+  const connectLocal = async () => {
+    try {
+      const response = await connectionAPI.connectLocal();
+      
+      if (response.data.success) {
+        const newSessionId = response.data.data.sessionId;
+        const connInfo = {
+          name: 'Local MongoDB',
+          connStr: 'mongodb://localhost:27017',
+          serverInfo: response.data.data.serverInfo,
+          isLocal: true,
+          connectedAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('mongoSessionId', newSessionId);
+        localStorage.setItem('connectionInfo', JSON.stringify(connInfo));
+
+        setSessionId(newSessionId);
+        setConnectionInfo(connInfo);
+        setIsConnected(true);
+
+        return { success: true, data: response.data.data };
+      } else {
+        return { success: false, error: response.data.message };
+      }
+    } catch (error) {
+      console.error('Local connection failed:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || error.message || 'Local MongoDB not available' 
+      };
+    }
+  };
+
+  const checkLocalAvailability = async () => {
+    try {
+      const response = await connectionAPI.checkLocal();
+      return response.data.data.available;
+    } catch (error) {
+      console.error('Failed to check local MongoDB:', error);
+      return false;
+    }
+  };
+
+  const disconnect = async () => {
+    try {
+      if (sessionId) {
+        await connectionAPI.disconnect();
+      }
+    } catch (error) {
+      console.error('Disconnect error:', error);
+    } finally {
+      clearConnection();
+    }
+  };
+
   const clearConnection = () => {
     setIsConnected(false);
+    setSessionId(null);
     setConnectionInfo(null);
     
-    // Update localStorage
-    const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-    savedConnections.forEach(conn => conn.active = false);
-    localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
+    localStorage.removeItem('mongoSessionId');
+    localStorage.removeItem('connectionInfo');
   };
 
-  // Context value
   const value = {
     isConnected,
     connectionInfo,
+    sessionId,
     loading,
-    checkConnectionStatus,
-    setConnection,
-    clearConnection
+    connect,
+    connectLocal,
+    checkLocalAvailability,
+    disconnect,
+    clearConnection,
+    checkConnectionStatus
   };
 
   return (
@@ -101,9 +170,6 @@ export const ConnectionProvider = ({ children }) => {
   );
 };
 
-/**
- * Custom hook to use connection context
- */
 export const useConnection = () => {
   const context = useContext(ConnectionContext);
   if (!context) {

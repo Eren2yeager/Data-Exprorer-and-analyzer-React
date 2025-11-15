@@ -17,6 +17,8 @@ import CollectionsPage from './pages/CollectionsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import SchemaPage from './pages/SchemaPage';
 import IndexesPage from './pages/IndexesPage';
+import AggregationPage from './pages/AggregationPage';
+import ExportImportPage from './pages/ExportImportPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Protected route component
@@ -49,6 +51,8 @@ function App() {
               <Route path="/databases/:dbName/collections/:collName/documents" element={<DocumentsPage />} />
               <Route path="/databases/:dbName/collections/:collName/schema" element={<SchemaPage />} />
               <Route path="/databases/:dbName/collections/:collName/indexes" element={<IndexesPage />} />
+              <Route path="/databases/:dbName/collections/:collName/aggregation" element={<AggregationPage />} />
+              <Route path="/databases/:dbName/collections/:collName/export-import" element={<ExportImportPage />} />
             </Route>
           </Route>
           

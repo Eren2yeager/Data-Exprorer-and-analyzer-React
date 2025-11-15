@@ -1,450 +1,765 @@
 /**
- * DocumentsPage Component
- * Page for displaying and managing documents within a MongoDB collection
- * Enhanced with responsive design and visual improvements
+ * DocumentsPage Component - Redesigned
+ * Advanced document explorer with query builder, JSON/Table views, and inline editing
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { documentAPI } from '../services/api';
-import useConfirmDialog from '../hooks/useConfirmDialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ResponsivePageContainer, 
-  PageHeader, 
-  ResponsiveCard, 
-  ResponsiveGrid,
-  Notification,
-  GradientButton,
-  Icons,
-  animationVariants
-} from '../components/common/ResponsiveUtils';
+import { documentAPI, collectionAPI } from '../services/api';
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Input,
+  Textarea,
+  Modal,
+  Badge,
+  TableSkeleton,
+  EmptyState,
+  NoDataEmptyState,
+} from '../components/ui';
+import CollectionNav from '../components/navigation/CollectionNav';
 
-// Import custom components
-import TabNavigation from '../components/navigation/TabNavigation';
-import QueryBuilder from '../components/documents/QueryBuilder';
-import DocumentList from '../components/documents/DocumentList';
-import DocumentViewer from '../components/documents/DocumentViewer';
-
-/**
- * Documents page component
- */
 const DocumentsPage = () => {
   const { dbName, collName } = useParams();
   const navigate = useNavigate();
   
-  // State for documents and pagination
+  // State
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalDocs, setTotalDocs] = useState(0);
+  const [viewMode, setViewMode] = useState('json');
+  const [queryFilter, setQueryFilter] = useState('{}');
+  const [sortQuery, setSortQuery] = useState('{}');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalDocuments, setTotalDocuments] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  
-  // State for query and sort
-  const [query, setQuery] = useState('{}');
-  const [sort, setSort] = useState('{}');
-  const [queryError, setQueryError] = useState(null);
-  
-  // State for document editing
-  const [showEditor, setShowEditor] = useState(false);
-  const [editingDoc, setEditingDoc] = useState(null);
-  const [editingDocId, setEditingDocId] = useState(null);
-  const [editingDocJson, setEditingDocJson] = useState('');
-  const {
-    confirmDeleteDocument,
-  } = useConfirmDialog();
-  /**
-   * Load documents on component mount and when query params change
-   */
-  useEffect(() => {
-    if (!dbName || !collName) {
-      navigate('/databases');
-      return;
-    }
-    
-    loadDocuments();
-  }, [dbName, collName, page, pageSize, navigate, query, sort]);
+  const [showQueryBuilder, setShowQueryBuilder] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [newDocument, setNewDocument] = useState('{}');
+  const [editDocument, setEditDocument] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [collectionStats, setCollectionStats] = useState(null);
+  const [selectedDocuments, setSelectedDocuments] = useState(new Set());
 
-  /**
-   * Load documents from API
-   */
+  useEffect(() => {
+    loadDocuments();
+    loadCollectionStats();
+  }, [dbName, collName, currentPage, pageSize]);
+
   const loadDocuments = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Parse query and sort JSON
-      let queryObj = {};
-      let sortObj = {};
+      let filter = {};
+      let sort = {};
       
-      try {
-        queryObj = query ? JSON.parse(query) : {};
-        sortObj = sort ? JSON.parse(sort) : {};
-        setQueryError(null);
-      } catch (err) {
-        setQueryError('Invalid JSON in query or sort');
-        queryObj = {};
-        sortObj = {};
+      if (queryFilter.trim() && queryFilter !== '{}') {
+        try {
+          filter = JSON.parse(queryFilter);
+        } catch (e) {
+          setError('Invalid filter JSON');
+          setLoading(false);
+          return;
+        }
       }
       
-      const response = await documentAPI.queryDocuments(
-        dbName,
-        collName,
-        {
-          filter: queryObj,
-          sort: sortObj,
-          page,
-          pageSize
+      if (sortQuery.trim() && sortQuery !== '{}') {
+        try {
+          sort = JSON.parse(sortQuery);
+        } catch (e) {
+          setError('Invalid sort JSON');
+          setLoading(false);
+          return;
         }
-      );
+      }
+      
+      const response = await documentAPI.queryDocuments(dbName, collName, {
+        filter,
+        sort,
+        page: currentPage,
+        pageSize
+      });
       
       if (response.data.success) {
-        // Check if the response has the expected structure
-        const documents = response.data.data.documents || [];
-        setDocuments(documents);
-        
-        // Handle pagination data correctly based on API response
-        const pagination = response.data.data.pagination || {};
-        setTotalDocs(pagination.total || 0);
-        setTotalPages(pagination.totalPages || Math.ceil((pagination.total || 0) / pageSize));
+        setDocuments(response.data.data.documents || []);
+        setTotalDocuments(response.data.data.pagination.total);
+        setTotalPages(response.data.data.pagination.totalPages);
       } else {
         setError(response.data.message || 'Failed to load documents');
       }
-    } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Failed to load documents');
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to load documents');
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Handle query submission from QueryBuilder
-   * @param {String} newQuery - New query JSON string
-   * @param {String} newSort - New sort JSON string
-   */
-  const handleQuerySubmit = (newQuery, newSort) => {
-    setQuery(newQuery);
-    setSort(newSort);
-    setPage(1); // Reset to first page when query changes
-    loadDocuments();
-  };
-
-  /**
-   * Handle page change
-   * @param {Number} newPage - New page number
-   */
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
+  const loadCollectionStats = async () => {
+    try {
+      const response = await collectionAPI.getCollectionStats(dbName, collName);
+      if (response.data.success) {
+        setCollectionStats(response.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load collection stats:', err);
     }
   };
 
-  /**
-   * Open document editor for creating a new document
-   */
-  const handleNewDocument = () => {
-    setEditingDoc({});
-    setEditingDocId(null);
-    setEditingDocJson('{}');
-    setShowEditor(true);
-  };
-
-  /**
-   * Open document editor for editing an existing document
-   * @param {Object} doc - Document to edit
-   */
-  const handleEditDocument = (doc) => {
-    setEditingDoc(doc);
-    setEditingDocId(doc._id);
-    setEditingDocJson(JSON.stringify(doc, null, 2));
-    setShowEditor(true);
-  };
-
-  /**
-   * Handle document deletion
-   * @param {String} id - Document ID
-   */
-  const handleDeleteDocument = async (id) => {
-    confirmDeleteDocument({
-      documentId: id,
-      collectionName: collName,
-      onConfirm: async () => {
-        try {
-          const response = await documentAPI.deleteDocument(dbName, collName, id);
-          
-          if (response.data.success) {
-            // Reload documents after deletion
-            loadDocuments();
-          } else {
-            setError(response.data.message || 'Failed to delete document');
-          }
-        } catch (error) {
-          setError(error.response?.data?.message || error.message || 'Failed to delete document');
-        }
-      },
-      onCancel: () => console.log('Delete cancelled')
-    });
-  };
-
-  /**
-   * Handle document save (create or update)
-   * @param {Event} e - Form submit event
-   */
-  const handleSaveDocument = async (e) => {
+  const handleCreateDocument = async (e) => {
     e.preventDefault();
+    setCreating(true);
     
     try {
-      const docData = JSON.parse(editingDocJson);
-      
-      if (editingDocId) {
-        // Update existing document - remove _id to prevent immutable field error
-        const { _id, ...updateData } = docData;
-        
-        // Update existing document
-        const response = await documentAPI.updateDocument(
-          dbName,
-          collName,
-          editingDocId,
-          updateData
-        );
-        
-        if (response.data.success) {
-          setShowEditor(false);
-          loadDocuments();
-        } else {
-          setError(response.data.message || 'Failed to update document');
-        }
-      } else {
-        // Create new document
-        const response = await documentAPI.insertDocument(
-          dbName,
-          collName,
-          docData
-        );
-        
-        if (response.data.success) {
-          setShowEditor(false);
-          loadDocuments();
-        } else {
-          setError(response.data.message || 'Failed to create document');
-        }
+      let docData;
+      try {
+        docData = JSON.parse(newDocument);
+      } catch (e) {
+        setError('Invalid JSON format');
+        setCreating(false);
+        return;
       }
-    } catch (error) {
-      setError(error.response?.data?.message || error.message || 'Invalid JSON');
+      
+      const response = await documentAPI.insertDocuments(dbName, collName, docData);
+      
+      if (response.data.success) {
+        setShowCreateModal(false);
+        setNewDocument('{}');
+        loadDocuments();
+        loadCollectionStats();
+      } else {
+        setError(response.data.message || 'Failed to create document');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to create document');
+    } finally {
+      setCreating(false);
     }
   };
 
-  // Render the document editor modal
-  const renderDocumentEditor = () => {
-    // Function to format JSON with proper indentation
-    const formatJson = () => {
+  const handleUpdateDocument = async (e) => {
+    e.preventDefault();
+    if (!showEditModal) return;
+    
+    setUpdating(true);
+    
+    try {
+      let updateData;
       try {
-        const parsed = JSON.parse(editingDocJson);
-        setEditingDocJson(JSON.stringify(parsed, null, 2));
-      } catch (err) {
-        // If JSON is invalid, don't change anything
+        updateData = JSON.parse(editDocument);
+      } catch (e) {
+        setError('Invalid JSON format');
+        setUpdating(false);
+        return;
       }
-    };
-
-    // Function to validate JSON
-    const validateJson = () => {
-      try {
-        JSON.parse(editingDocJson);
-        return true;
-      } catch (err) {
-        return false;
+      
+      // Remove _id field as it's immutable in MongoDB
+      const { _id, ...dataWithoutId } = updateData;
+      
+      const response = await documentAPI.updateDocument(dbName, collName, showEditModal._id, dataWithoutId);
+      
+      if (response.data.success) {
+        setShowEditModal(null);
+        setEditDocument('');
+        loadDocuments();
+      } else {
+        setError(response.data.message || 'Failed to update document');
       }
-    };
-
-    const isValidJson = validateJson();
-
-    return (
-      <AnimatePresence>
-        {showEditor && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-            >
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  {editingDocId ? 'Edit Document' : 'New Document'}
-                  {editingDocId && <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">ID: {editingDocId}</span>}
-                </h3>
-                <button
-                  onClick={() => setShowEditor(false)}
-                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <form onSubmit={handleSaveDocument} className="p-4">
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-1">
-                    <label htmlFor="documentJson" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Document JSON
-                    </label>
-                    <div className="flex space-x-2">
-                      <button
-                        type="button"
-                        onClick={formatJson}
-                        className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                      >
-                        Format JSON
-                      </button>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <textarea
-                      id="documentJson"
-                      name="documentJson"
-                      rows="15"
-                      className={`shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md font-mono ${!isValidJson && editingDocJson ? 'border-red-500 dark:border-red-500' : ''}`}
-                      value={editingDocJson}
-                      onChange={(e) => setEditingDocJson(e.target.value)}
-                      spellCheck="false"
-                    />
-                    {!isValidJson && editingDocJson && (
-                      <div className="absolute top-0 right-0 mt-2 mr-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Invalid JSON
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {editingDocId && (
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Note: The _id field will be automatically excluded when updating the document.
-                    </p>
-                  )}
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    onClick={() => setShowEditor(false)}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    disabled={!isValidJson}
-                    className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isValidJson ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-400 cursor-not-allowed'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-                  >
-                    Save
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to update document');
+    } finally {
+      setUpdating(false);
+    }
   };
-  
+
+  const handleDeleteDocument = async (docId) => {
+    try {
+      const response = await documentAPI.deleteDocument(dbName, collName, docId);
+      
+      if (response.data.success) {
+        setDeleteModal(null);
+        loadDocuments();
+        loadCollectionStats();
+      } else {
+        setError(response.data.message || 'Failed to delete document');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to delete document');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedDocuments.size === 0) return;
+    
+    try {
+      const deletePromises = Array.from(selectedDocuments).map(docId =>
+        documentAPI.deleteDocument(dbName, collName, docId)
+      );
+      
+      await Promise.all(deletePromises);
+      setSelectedDocuments(new Set());
+      loadDocuments();
+      loadCollectionStats();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to delete selected documents');
+    }
+  };
+
+  const handleSelectDocument = (docId) => {
+    const newSelected = new Set(selectedDocuments);
+    if (newSelected.has(docId)) {
+      newSelected.delete(docId);
+    } else {
+      newSelected.add(docId);
+    }
+    setSelectedDocuments(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDocuments.size === documents.length) {
+      setSelectedDocuments(new Set());
+    } else {
+      setSelectedDocuments(new Set(documents.map(doc => doc._id)));
+    }
+  };
+
+  const formatJSON = (obj) => {
+    return JSON.stringify(obj, null, 2);
+  };
+
+  const formatSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const getTableColumns = () => {
+    if (documents.length === 0) return [];
+    
+    const allKeys = new Set();
+    documents.forEach(doc => {
+      Object.keys(doc).forEach(key => allKeys.add(key));
+    });
+    
+    return Array.from(allKeys);
+  };
+
+  const renderTableValue = (value) => {
+    if (value === null || value === undefined) {
+      return <span className="text-gray-400 italic">null</span>;
+    }
+    if (typeof value === 'object') {
+      return <span className="text-blue-600 dark:text-blue-400 text-xs">{JSON.stringify(value)}</span>;
+    }
+    if (typeof value === 'boolean') {
+      return <Badge variant={value ? 'success' : 'danger'} size="sm">{String(value)}</Badge>;
+    }
+    if (typeof value === 'number') {
+      return <span className="text-purple-600 dark:text-purple-400">{value}</span>;
+    }
+    return <span className="text-gray-900 dark:text-gray-100">{String(value)}</span>;
+  };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {/* Navigation and Header */}
-      <div className="mb-6">
-        <TabNavigation dbName={dbName} collName={collName} />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-green-50 to-teal-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            {/* Breadcrumb */}
+            <nav className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+              <button
+                onClick={() => navigate('/databases')}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Databases
+              </button>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+              <button
+                onClick={() => navigate(`/databases/${dbName}/collections`)}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                {dbName}
+              </button>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+              <span className="text-gray-900 dark:text-white font-medium">{collName}</span>
+            </nav>
 
-      {/* Error message */}
-      {error && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 border-l-4 border-red-400 p-4 mb-6"
-        >
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+              Documents
+            </h1>
+            {collectionStats && (
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {totalDocuments.toLocaleString()} documents • {formatSize(collectionStats.size)}
+              </p>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-3 mt-4 md:mt-0"
+          >
+            <Button
+              variant="outline"
+              onClick={() => setShowQueryBuilder(!showQueryBuilder)}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Query
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Document
+            </Button>
+          </motion.div>
+        </div>
+
+        {/* Collection Navigation */}
+        <CollectionNav />
+
+        {/* Query Builder */}
+        <AnimatePresence>
+          {showQueryBuilder && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Query Builder</CardTitle>
+                  <CardDescription>Filter and sort documents using MongoDB query syntax</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Filter (JSON)
+                      </label>
+                      <Textarea
+                        value={queryFilter}
+                        onChange={(e) => setQueryFilter(e.target.value)}
+                        placeholder='{"status": "active"}'
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Sort (JSON)
+                      </label>
+                      <Textarea
+                        value={sortQuery}
+                        onChange={(e) => setSortQuery(e.target.value)}
+                        placeholder='{"createdAt": -1}'
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={loadDocuments} className="mr-2">
+                    Apply Query
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setQueryFilter('{}');
+                      setSortQuery('{}');
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error Alert */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+          >
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
+              <span className="text-red-800 dark:text-red-200">{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="ml-auto text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+          </motion.div>
+        )}
+
+        {/* View Mode Toggle */}
+        <div className="flex sm:flex-row flex-col sm:items-center justify-between mb-6 gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === 'json' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('json')}
+            >
+              JSON View
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+            >
+              Table View
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
+            {documents.length > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedDocuments.size === documents.length && documents.length > 0}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Select All
+                </span>
+              </label>
+            )}
+
+            {selectedDocuments.size > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedDocuments.size} selected
+                </span>
+                <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
+                  Delete Selected
+                </Button>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {loading && <TableSkeleton count={5} />}
+
+        {/* Empty State */}
+        {!loading && documents.length === 0 && !error && (
+          <NoDataEmptyState
+            title="No documents found"
+            description="This collection is empty or no documents match your query"
+            action={
+              <Button onClick={() => setShowCreateModal(true)}>
+                Create First Document
+              </Button>
+            }
+          />
+        )}
+
+        {/* Documents List - JSON View */}
+        {!loading && documents.length > 0 && viewMode === 'json' && (
+          <div className="space-y-4">
+            {documents.map((doc, index) => (
+              <motion.div
+                key={doc._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center ">
+                      <div className="flex items-center gap-3 truncate w-full">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocuments.has(doc._id)}
+                          onChange={() => handleSelectDocument(doc._id)}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div>
+                          <CardTitle className="text-sm font-mono truncate w-full">{doc._id}</CardTitle>
+                          <CardDescription className="text-xs">Document ID</CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowEditModal(doc);
+                            setEditDocument(formatJSON(doc));
+                          }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setDeleteModal(doc)}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto text-sm">
+                      <code className="text-gray-800 dark:text-gray-200">{formatJSON(doc)}</code>
+                    </pre>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Documents List - Table View */}
+        {!loading && documents.length > 0 && viewMode === 'table' && (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocuments.size === documents.length}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                    </th>
+                    {getTableColumns().map(col => (
+                      <th key={col} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {col}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {documents.map((doc) => (
+                    <tr key={doc._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocuments.has(doc._id)}
+                          onChange={() => handleSelectDocument(doc._id)}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                      </td>
+                      {getTableColumns().map(col => (
+                        <td key={col} className="px-4 py-3 text-sm">
+                          {renderTableValue(doc[col])}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setShowEditModal(doc);
+                              setEditDocument(formatJSON(doc));
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => setDeleteModal(doc)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {/* Pagination */}
+        {!loading && documents.length > 0 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+              >
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
             </div>
           </div>
-        </motion.div>
-      )}
-
-      {/* Query Builder */}
-      <QueryBuilder 
-        query={query}
-        sort={sort}
-        onQueryChange={setQuery}
-        onSortChange={setSort}
-        onSubmit={handleQuerySubmit}
-      />
-
-      {/* Action buttons */}
-      <div className="mb-6 flex flex-col sm:justify-start sm:flex-row ">
-        <div className="flex space-x-2">
-          <motion.button
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }}
-            onClick={handleNewDocument}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Document
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={loadDocuments}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </motion.button>
-        </div>
-        <div className="text-sm text-gray-500 ml-auto">
-          {totalDocs > 0 ? `${totalDocs} document${totalDocs !== 1 ? 's' : ''}` : 'No documents'}
-        </div>
+        )}
       </div>
 
-      {/* Document List */}
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="h-8 w-8 border-2 border-blue-500 rounded-full border-t-transparent"
-          />
-        </div>
-      ) : (
-        <DocumentList
-          documents={documents}
-          pagination={{ page, pageSize, totalDocs, totalPages }}
-          onPageChange={handlePageChange}
-          onEditDocument={handleEditDocument}
-          onDeleteDocument={handleDeleteDocument}
-        />
-      )}
+      {/* Create Document Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create New Document"
+      >
+        <form onSubmit={handleCreateDocument}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Document JSON
+            </label>
+            <Textarea
+              value={newDocument}
+              onChange={(e) => setNewDocument(e.target.value)}
+              placeholder='{"name": "John Doe", "email": "john@example.com"}'
+              rows={10}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={creating}>
+              {creating ? 'Creating...' : 'Create Document'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-      {/* Document Editor Modal */}
-      {renderDocumentEditor()}
+      {/* Edit Document Modal */}
+      <Modal
+        isOpen={!!showEditModal}
+        onClose={() => setShowEditModal(null)}
+        title="Edit Document"
+      >
+        <form onSubmit={handleUpdateDocument}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Document JSON
+            </label>
+            <Textarea
+              value={editDocument}
+              onChange={(e) => setEditDocument(e.target.value)}
+              rows={15}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditModal(null)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updating}>
+              {updating ? 'Updating...' : 'Update Document'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        title="Delete Document"
+      >
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          Are you sure you want to delete this document? This action cannot be undone.
+        </p>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-6">
+          <p className="text-sm font-mono text-gray-800 dark:text-gray-200">
+            ID: {deleteModal?._id}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteModal(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => handleDeleteDocument(deleteModal._id)}
+          >
+            Delete Document
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

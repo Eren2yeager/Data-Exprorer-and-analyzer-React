@@ -1,189 +1,194 @@
 /**
- * ConnectionPage Component
- * Page for managing MongoDB connections with responsive design
- * and enhanced visual elements
+ * ConnectionPage Component - Redesigned
+ * Modern MongoDB connection management with beautiful UI
  */
-import React, { useState, useEffect, useReducer } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ConnectionForm from '../components/connection/ConnectionForm';
-import { connectionAPI } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConnection } from '../../Contexts/connection-context';
-// Import responsive utilities
-import { 
-  ResponsivePageContainer, 
-  PageHeader, 
-  ResponsiveCard, 
-  ResponsiveGrid,
-  Notification,
-  GradientButton,
-  Icons,
-  animationVariants
-} from '../components/common/ResponsiveUtils';
-
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Input,
+  Badge,
+  EmptyState,
+  Modal,
+} from '../components/ui';
 
 const ConnectionPage = () => {
   const navigate = useNavigate();
-  const [connections, setConnections] = useState([]);
+  const { connect, connectLocal, checkLocalAvailability } = useConnection();
+  
+  // State
+  const [connectionString, setConnectionString] = useState('');
+  const [connectionName, setConnectionName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingLocal, setLoadingLocal] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(null); // Track which saved connection is loading
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [activeTab, setActiveTab] = useState('new'); // 'new' or 'saved'
-  const { setConnection } = useConnection();
-  
-  // Use reducer for forcing update
-  const [, forceUpdate] = useReducer(x => x + 1, 0);
-  
-  // Load saved connections from local storage
-  const [savedConnectionsList, setSavedConnectionsList] = useState(
-    JSON.parse(localStorage.getItem('mongoConnections') || '[]')
-  );
+  const [savedConnections, setSavedConnections] = useState([]);
+  const [localAvailable, setLocalAvailable] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [editingConnection, setEditingConnection] = useState(null);
 
-  /**
-   * Load saved connections on component mount
-   */
+  // Load saved connections and check local MongoDB
   useEffect(() => {
-    loadConnections();
-    
-    // Auto-dismiss notifications after 5 seconds
+    loadSavedConnections();
+    checkLocal();
+  }, []);
+
+  // Auto-dismiss notifications
+  useEffect(() => {
     if (error || success) {
       const timer = setTimeout(() => {
         setError(null);
         setSuccess(null);
       }, 5000);
-      
       return () => clearTimeout(timer);
     }
   }, [error, success]);
 
-  /**
-   * Load active connections from the API and localStorage
-   */
-  const loadConnections = async () => {
-    setLoading(true);
-    try {
-      // Get active connections from API
-      const response = await connectionAPI.getConnections();
-      if (response.data.success) {
-        setConnections(response.data.data || []);
-      }
-      
-      // Also check localStorage for active connections
-      const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-      const activeConn = savedConnections.find(conn => conn.active === true);
-      if (activeConn && !connections.some(conn => conn.connStr === activeConn.connStr)) {
-        setConnections(prev => [...prev, { 
-          connStr: activeConn.connStr,
-          name: activeConn.name
-        }]);
-      }
-      
-      // Update saved connections list
-      setSavedConnectionsList(savedConnections);
-    } catch (error) {
-      console.error('Failed to load connections:', error);
-    } finally {
-      setLoading(false);
-    }
+  const loadSavedConnections = () => {
+    const saved = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+    setSavedConnections(saved);
   };
 
-  /**
-   * Handle successful connection
-   * @param {String} connStr - Connection string
-   * @param {String} name - Connection name
-   * @param {Object} data - Connection data
-   */
-  const handleConnect = (connStr, name, data) => {
-    setSuccess(`Connected successfully to ${name}`);
+  const checkLocal = async () => {
+    const available = await checkLocalAvailability();
+    setLocalAvailable(available);
+  };
+
+  const handleConnect = async (e) => {
+    e.preventDefault();
+    if (!connectionString.trim()) {
+      setError('Connection string is required');
+      return;
+    }
+
+    setLoading(true);
     setError(null);
-    
-    // Store connection in local storage for persistence
-    const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-    
-    // Set all connections to inactive first
-    savedConnections.forEach(conn => conn.active = false);
-    
-    const existingIndex = savedConnections.findIndex(conn => conn.connStr === connStr);
-    
-    const connectionData = { 
-      connStr, 
-      name, 
-      timestamp: Date.now(),
-      active: true 
-    };
-    
-    if (existingIndex >= 0) {
-      savedConnections[existingIndex] = connectionData;
-    } else {
-      savedConnections.push(connectionData);
-    }
-    
-    // Save to localStorage
-    localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
-    
-    // Update saved connections list
-    setSavedConnectionsList(savedConnections);
-    
-    // Update connection context
-    setConnection(connectionData);
-    
-    // Navigate to databases page
-    navigate('/databases');
-  };
 
-  /**
-   * Handle connection error
-   * @param {String} message - Error message
-   */
-  const handleError = (message) => {
-    setError(message);
-    setSuccess(null);
-  };
-
-  /**
-   * Connect to a saved connection
-   * @param {Object} connection - Connection object
-   */
-  const connectToSaved = async (connection) => {
-    setLoading(true);
     try {
-      const response = await connectionAPI.connect(connection.connStr);
-      
-      if (response.data.success) {
-        handleConnect(connection.connStr, connection.name, response.data.data);
+      const result = await connect(
+        connectionString,
+        connectionName || 'MongoDB Connection'
+      );
+
+      if (result.success) {
+        // Save to localStorage
+        const saved = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+        const newConnection = {
+          connStr: connectionString,
+          name: connectionName || 'MongoDB Connection',
+          timestamp: Date.now(),
+        };
+
+        const existingIndex = saved.findIndex(c => c.connStr === connectionString);
+        if (existingIndex >= 0) {
+          saved[existingIndex] = newConnection;
+        } else {
+          saved.unshift(newConnection);
+        }
+
+        localStorage.setItem('mongoConnections', JSON.stringify(saved));
+        
+        setSuccess('Connected successfully!');
+        setTimeout(() => navigate('/databases'), 1000);
       } else {
-        handleError(response.data.message || 'Failed to connect');
+        setError(result.error || 'Connection failed');
       }
-    } catch (error) {
-      handleError(error.response?.data?.message || error.message || 'Connection failed');
+    } catch (err) {
+      setError(err.message || 'Connection failed');
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Format timestamp to readable date
-   * @param {Number} timestamp - Timestamp in milliseconds
-   * @returns {String} Formatted date string
-   */
+  const handleConnectLocal = async () => {
+    setLoadingLocal(true);
+    setError(null);
+
+    try {
+      const result = await connectLocal();
+      
+      if (result.success) {
+        setSuccess('Connected to local MongoDB!');
+        setTimeout(() => navigate('/databases'), 1000);
+      } else {
+        setError(result.error || 'Local MongoDB not available');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to connect to local MongoDB');
+    } finally {
+      setLoadingLocal(false);
+    }
+  };
+
+  const handleConnectSaved = async (connection, index) => {
+    setLoadingSaved(index);
+    setError(null);
+
+    try {
+      const result = await connect(connection.connStr, connection.name);
+      
+      if (result.success) {
+        setSuccess(`Connected to ${connection.name}!`);
+        setTimeout(() => navigate('/databases'), 1000);
+      } else {
+        setError(result.error || 'Connection failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Connection failed');
+    } finally {
+      setLoadingSaved(null);
+    }
+  };
+
+  const handleDeleteConnection = (index) => {
+    const saved = [...savedConnections];
+    saved.splice(index, 1);
+    localStorage.setItem('mongoConnections', JSON.stringify(saved));
+    setSavedConnections(saved);
+    setDeleteModal(null);
+    setSuccess('Connection deleted');
+  };
+
+  const handleEditConnection = (index) => {
+    setEditingConnection({ ...savedConnections[index], index });
+  };
+
+  const handleSaveEdit = () => {
+    const saved = [...savedConnections];
+    saved[editingConnection.index] = {
+      connStr: editingConnection.connStr,
+      name: editingConnection.name,
+      timestamp: editingConnection.timestamp,
+    };
+    localStorage.setItem('mongoConnections', JSON.stringify(saved));
+    setSavedConnections(saved);
+    setEditingConnection(null);
+    setSuccess('Connection updated');
+  };
+
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
     
-    // If today, show time only
     if (date.toDateString() === now.toDateString()) {
       return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // If yesterday, show "Yesterday"
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
       return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // Otherwise show full date
     return date.toLocaleString([], {
       month: 'short',
       day: 'numeric',
@@ -192,464 +197,325 @@ const ConnectionPage = () => {
     });
   };
 
-  /**
-   * Delete a saved connection
-   * @param {Number} index - Connection index
-   */
-  const deleteConnection = (index) => {
-    const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-    savedConnections.splice(index, 1);
-    localStorage.setItem('mongoConnections', JSON.stringify(savedConnections));
-    setDeleteConfirm(null);
-    // Update saved connections list
-    setSavedConnectionsList(savedConnections);
-    forceUpdate();
-  };
-  //   JSON.parse(localStorage.getItem('mongoConnections') || '[]')
-  // );
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { type: 'spring', stiffness: 100 }
-    }
-  };
-
-  const notificationVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { type: 'spring', stiffness: 100 }
-    },
-    exit: { 
-      opacity: 0, 
-      y: -20,
-      transition: { duration: 0.3 }
-    }
-  };
-
-  const pageTransition = {
-    type: "tween",
-    ease: "anticipate",
-    duration: 0.5
-  };
-
-  const pageVariants = {
-    initial: { opacity: 0, y: 20 },
-    in: { opacity: 1, y: 0 },
-    out: { opacity: 0, y: -20 }
-  };
-
   return (
-    <ResponsivePageContainer>
-      {/* Header with animated gradient text */}
-      <PageHeader 
-        title="MongoDB Connection"
-        subtitle="Connect to your MongoDB instances and explore your data with ease"
-      />
-        
-        {/* Error/Success messages */}
-        <div className="fixed top-4 right-4 z-50 w-full max-w-sm sm:max-w-md">
-          <AnimatePresence>
-            {error && (
-              <Notification 
-                type="error" 
-                message={error} 
-                onDismiss={() => setError(null)} 
-              />            
-            )}
-            
-            {success && (
-              <Notification 
-                type="success" 
-                message={success} 
-                onDismiss={() => setSuccess(null)} 
-              />
-            )}
-          </AnimatePresence>
-        </div>
-        
-        {/* Mobile tab switcher */}
-        <div className="lg:hidden mb-6">
-          <div className="flex rounded-lg bg-white dark:bg-gray-800 p-1 shadow-md">
-            <button
-              onClick={() => setActiveTab('new')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                activeTab === 'new'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12"
+        >
+          <h1 className="text-5xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              MongoDB Connection
+            </span>
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-400">
+            Connect to your MongoDB instances and explore your data
+          </p>
+        </motion.div>
+
+        {/* Notifications */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6 max-w-2xl mx-auto"
             >
-              New Connection
-            </button>
-            <button
-              onClick={() => setActiveTab('saved')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                activeTab === 'saved'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start">
+                <svg className="w-5 h-5 text-red-500 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="font-medium text-red-800 dark:text-red-200">{error}</p>
+                </div>
+                <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6 max-w-2xl mx-auto"
             >
-              Saved Connections {savedConnectionsList.length > 0 && `(${savedConnectionsList.length})`}
-            </button>
-          </div>
-        </div>
-        
+              <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start">
+                <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="font-medium text-green-800 dark:text-green-200">{success}</p>
+                </div>
+                <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-700">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Connection form */}
+          {/* New Connection Form */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
-            animate={{ 
-              opacity: activeTab === 'new' || window.innerWidth >= 1024 ? 1 : 0,
-              x: activeTab === 'new' || window.innerWidth >= 1024 ? 0 : -20,
-              height: activeTab === 'new' || window.innerWidth >= 1024 ? 'auto' : 0
-            }}
-            transition={{ duration: 0.5 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 ${
-              activeTab !== 'new' && window.innerWidth < 1024 ? 'hidden' : ''
-            }`}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
           >
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-white/20 p-2 rounded-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h2 className="text-xl font-bold text-white">New Connection</h2>
-                  <p className="text-blue-100 text-sm">Connect to a MongoDB instance</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6">
-              <ConnectionForm 
-                onConnect={handleConnect} 
-                onError={handleError} 
-              />
-            </div>
-          </motion.div>
-          
-          {/* Saved connections */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ 
-              opacity: activeTab === 'saved' || window.innerWidth >= 1024 ? 1 : 0,
-              x: activeTab === 'saved' || window.innerWidth >= 1024 ? 0 : 20,
-              height: activeTab === 'saved' || window.innerWidth >= 1024 ? 'auto' : 0
-            }}
-            transition={{ duration: 0.5 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 ${
-              activeTab !== 'saved' && window.innerWidth < 1024 ? 'hidden' : ''
-            }`}
-          >
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-white/20 p-2 rounded-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h2 className="text-xl font-bold text-white">Saved Connections</h2>
-                  <p className="text-purple-100 text-sm">Quick access to your MongoDB instances</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 max-h-[600px] overflow-y-auto">
-              {savedConnectionsList.length === 0 ? (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-center py-12"
-                >
-                  <div className="bg-gray-50 dark:bg-gray-700/30 rounded-full p-4 inline-flex mx-auto mb-4">
-                    <svg className="h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            <Card gradient="blue" padding="lg" shadow="xl">
+              <CardHeader>
+                <div className="flex items-center mb-2">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No saved connections</h3>
-                  <p className="text-gray-500 dark:text-gray-400">Connect to a database to save it here</p>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setActiveTab('new')}
-                    className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 lg:hidden"
-                  >
-                    Create New Connection
-                  </motion.button>
-                </motion.div>
-              ) : (
-                <motion.ul 
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className="space-y-4"
-                >
-                  {savedConnectionsList.map((conn, index) => (
-                    <motion.li 
-                      key={index} 
-                      variants={itemVariants}
-                      className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-750 rounded-xl p-4 hover:shadow-md transition-all duration-200 border border-gray-100 dark:border-gray-700"
-                      whileHover={{ 
-                        scale: 1.02,
-                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
-                      }}
+                  <div>
+                    <CardTitle>New Connection</CardTitle>
+                    <CardDescription>Connect to a MongoDB instance</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <form onSubmit={handleConnect} className="space-y-4">
+                  <Input
+                    label="Connection Name"
+                    placeholder="My MongoDB"
+                    value={connectionName}
+                    onChange={(e) => setConnectionName(e.target.value)}
+                  />
+
+                  <Input
+                    label="Connection String"
+                    placeholder="mongodb://localhost:27017 or mongodb+srv://..."
+                    value={connectionString}
+                    onChange={(e) => setConnectionString(e.target.value)}
+                    required
+                    helperText="Enter your MongoDB connection string"
+                  />
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      gradient
+                      loading={loading}
+                      fullWidth
+                      icon={
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      }
                     >
-                      <div className="flex flex-col  justify-between items-start">
-                        <div className=" w-full mb-3 sm:mb-0">
-                          {conn.isEditing ? (
-                            <div className="mb-3">
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection Name</label>
-                              <input 
-                                type="text" 
-                                value={conn.editName || conn.name} 
-                                onChange={(e) => {
-                                  const updatedConnections = [...savedConnectionsList];
-                                  updatedConnections[index] = { ...conn, editName: e.target.value };
-                                  setSavedConnectionsList(updatedConnections);
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <h3 className="font-medium text-gray-900 dark:text-white text-lg flex items-center">
-                              <svg className="h-5 w-5 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                      Connect
+                    </Button>
+                  </div>
+                </form>
+
+                {/* Quick Connect to Local */}
+                {localAvailable && (
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Quick connect to local MongoDB
+                    </p>
+                    <Button
+                      onClick={handleConnectLocal}
+                      variant="success"
+                      gradient
+                      loading={loadingLocal}
+                      fullWidth
+                      icon={
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                      }
+                    >
+                      Connect to localhost:27017
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Saved Connections */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card gradient="purple" padding="lg" shadow="xl">
+              <CardHeader>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg mr-3">
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <CardTitle>Saved Connections</CardTitle>
+                      <CardDescription>
+                        {savedConnections.length} saved connection{savedConnections.length !== 1 ? 's' : ''}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <div className="max-h-[500px] overflow-y-auto space-y-3">
+                  {savedConnections.length === 0 ? (
+                    <EmptyState
+                      icon={
+                        <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                      }
+                      title="No saved connections"
+                      description="Connect to a database to save it here for quick access"
+                    />
+                  ) : (
+                    savedConnections.map((conn, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="bg-white dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
+                              <svg className="w-4 h-4 text-purple-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z" />
+                                <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z" />
+                                <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z" />
                               </svg>
                               {conn.name}
-                            </h3>
-                          )}
-                          
-                          {conn.isEditing ? (
-                            <div className="mb-3">
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection String</label>
-                              <input 
-                                type="text" 
-                                value={conn.editConnStr || conn.connStr} 
-                                onChange={(e) => {
-                                  const updatedConnections = [...savedConnectionsList];
-                                  updatedConnections[index] = { ...conn, editConnStr: e.target.value };
-                                  setSavedConnectionsList(updatedConnections);
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <div className="mt-2 flex items-center bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-1.5">
-                              <svg className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                              </svg>
-                              <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[200px] sm:max-w-xs">{conn.connStr}</p>
-                            </div>
-                          )}
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center">
-                            <svg className="h-3.5 w-3.5 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {formatDate(conn.timestamp)}
-                          </p>
-                        </div>
-                        <div className="flex space-x-2 w-full sm:w-auto mt-3 ">
-                          {conn.isEditing ? (
-                            <>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                  const updatedConnections = [...savedConnectionsList];
-                                  updatedConnections[index] = { 
-                                    ...conn, 
-                                    name: conn.editName || conn.name,
-                                    connStr: conn.editConnStr || conn.connStr,
-                                    isEditing: false 
-                                  };
-                                  setSavedConnectionsList(updatedConnections);
-                                  localStorage.setItem('mongoConnections', JSON.stringify(updatedConnections));
-                                }}
-                                className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm font-medium shadow-sm transition-all duration-200 flex items-center justify-center"
-                              >
-                                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span>Save</span>
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                  const updatedConnections = [...savedConnectionsList];
-                                  updatedConnections[index] = { ...conn, isEditing: false };
-                                  setSavedConnectionsList(updatedConnections);
-                                }}
-                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200"
-                              >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </motion.button>
-                            </>
-                          ) : (
-                            <>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => connectToSaved(conn)}
-                                disabled={loading}
-                                className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-medium shadow-sm transition-all duration-200 flex items-center justify-center"
-                              >
-                                {loading ? (
-                                  <svg className="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                ) : (
-                                  <>
-                                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    <span>Connect</span>
-                                  </>
-                                )}
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                  const updatedConnections = [...savedConnectionsList];
-                                  updatedConnections[index] = { 
-                                    ...conn, 
-                                    isEditing: true,
-                                    editName: conn.name,
-                                    editConnStr: conn.connStr
-                                  };
-                                  setSavedConnectionsList(updatedConnections);
-                                }}
-                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200 flex items-center justify-center"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setDeleteConfirm(index)}
-                                className="flex-1 sm:flex-none px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-sm font-medium transition-all duration-200"
-                              >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </motion.button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Delete confirmation */}
-                      <AnimatePresence>
-                        {deleteConfirm === index && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mt-3 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800"
-                          >
-                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">Are you sure you want to delete this connection?</p>
-                            <div className="mt-3 flex space-x-3">
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => deleteConnection(index)}
-                                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 shadow-sm hover:shadow transition-all duration-200 flex-1"
-                              >
-                                Delete
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setDeleteConfirm(null)}
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 flex-1"
-                              >
-                                Cancel
-                              </motion.button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.li>
-                  ))}
-                </motion.ul>
-              )}
-              
-              {/* Active connections */}
-              {connections.length > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
-                  className="mt-8 bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm"
-                >
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                    <span className="relative flex h-3 w-3 mr-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                    Active Connections
-                  </h3>
-                  <ul className="bg-gray-50 dark:bg-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-600 overflow-hidden">
-                    {connections.map((conn, index) => (
-                      <li key={index} className="py-3 px-4 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150">
-                        <div className="flex items-center">
-                          <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full mr-3">
-                            <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                            </svg>
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+                              {conn.connStr}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                              {formatDate(conn.timestamp)}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-xs">{conn.connStr}</p>
                         </div>
-                        <div className="flex items-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-300">
-                            Active
-                          </span>
+
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            onClick={() => handleConnectSaved(conn, index)}
+                            variant="primary"
+                            size="sm"
+                            gradient
+                            loading={loadingSaved === index}
+                            className="flex-1"
+                          >
+                            Connect
+                          </Button>
+                          <Button
+                            onClick={() => handleEditConnection(index)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </Button>
+                          <Button
+                            onClick={() => setDeleteModal(index)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </Button>
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </motion.div>
-              )}
-            </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
         </div>
-        
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-12 text-center text-sm text-gray-500 dark:text-gray-400"
-        >
-          <p>MongoDB Data Explorer and Analyzer</p>
-          <p className="mt-1">Connect, explore, and analyze your MongoDB data with ease</p>
-        </motion.div>
-    </ResponsivePageContainer>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteModal !== null}
+        onClose={() => setDeleteModal(null)}
+        title="Delete Connection"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteModal(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              gradient
+              onClick={() => handleDeleteConnection(deleteModal)}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-gray-600 dark:text-gray-400">
+          Are you sure you want to delete this connection? This action cannot be undone.
+        </p>
+      </Modal>
+
+      {/* Edit Connection Modal */}
+      <Modal
+        isOpen={editingConnection !== null}
+        onClose={() => setEditingConnection(null)}
+        title="Edit Connection"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setEditingConnection(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" gradient onClick={handleSaveEdit}>
+              Save Changes
+            </Button>
+          </div>
+        }
+      >
+        {editingConnection && (
+          <div className="space-y-4">
+            <Input
+              label="Connection Name"
+              value={editingConnection.name}
+              onChange={(e) =>
+                setEditingConnection({ ...editingConnection, name: e.target.value })
+              }
+            />
+            <Input
+              label="Connection String"
+              value={editingConnection.connStr}
+              onChange={(e) =>
+                setEditingConnection({ ...editingConnection, connStr: e.target.value })
+              }
+            />
+          </div>
+        )}
+      </Modal>
+    </div>
   );
 };
-
 
 export default ConnectionPage;

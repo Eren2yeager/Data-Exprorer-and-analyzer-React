@@ -18,7 +18,7 @@ import { collectionAPI } from '../../services/api';
  * @param {String} props.selectedColl - Currently selected collection
  * @param {Function} props.onSelectDatabase - Database selection handler
  * @param {Function} props.onSelectCollection - Collection selection handler
- * @param {Function} props.onGetCollections - Function to get collections for a database
+ * @param {Boolean} props.loading - Loading state for databases
  * @param {String} props.connectionName - Name of the current MongoDB connection
  */
 const Sidebar = ({ 
@@ -28,7 +28,7 @@ const Sidebar = ({
   selectedColl,
   onSelectDatabase,
   onSelectCollection,
-  onGetCollections,
+  loading = false,
   connectionName
 }) => {
   const navigate = useNavigate();
@@ -77,12 +77,12 @@ const Sidebar = ({
     }));
     
     // If expanding and we don't have collections for this database yet, fetch them
-    if (willExpand && !dbCollections[dbName] && onGetCollections) {
+    if (willExpand && dbCollections[dbName] === undefined) {
       try {
-        // Set a loading state for this database
+        // Set a loading state for this database (null means loading)
         setDbCollections(prev => ({
           ...prev,
-          [dbName]: [] // Empty array indicates loading
+          [dbName]: null
         }));
         
         const response = await collectionAPI.listCollections(dbName);
@@ -92,7 +92,7 @@ const Sidebar = ({
             [dbName]: response.data.data || []
           }));
         } else {
-          // If API call fails, set empty array to avoid infinite loading
+          // If API call fails, set empty array
           setDbCollections(prev => ({
             ...prev,
             [dbName]: []
@@ -100,7 +100,7 @@ const Sidebar = ({
         }
       } catch (error) {
         console.error(`Failed to load collections for ${dbName}:`, error);
-        // Set empty array on error to avoid infinite loading
+        // Set empty array on error
         setDbCollections(prev => ({
           ...prev,
           [dbName]: []
@@ -219,63 +219,48 @@ const Sidebar = ({
 
       {/* Sidebar */}
       <motion.div
-        className={`bg-gray-100 w-64 h-full overflow-y-auto border-r border-gray-200 ${
-          isMobileView ? 'fixed left-0 top-0 bottom-0 shadow-xl z-50' : 'relative z-20'
+        className={`bg-white dark:bg-gray-800 w-64 h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 shadow-lg ${
+          isMobileView ? 'fixed left-0 top-0 bottom-0 shadow-2xl z-50' : 'relative z-20'
         }`}
         initial="closed"
         animate={isSidebarOpen ? "open" : "closed"}
         variants={sidebarVariants}
       >
         {/* Connection info */}
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-600">CONNECTED TO</h2>
-          <div className="mt-1 text-sm text-gray-800 flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-            <span className="truncate">{connectionName || "MongoDB Connection"}</span>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+          <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connected To</h2>
+          <div className="mt-2 text-sm text-gray-900 dark:text-white flex items-center">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+            <span className="truncate font-medium">{connectionName || "MongoDB Connection"}</span>
           </div>
         </div>
 
         {/* Navigation Links */}
-        <div className="p-4 border-b border-gray-200">
-          <ul className="space-y-2">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <ul className="space-y-1">
             <li>
               <button 
-                className="w-full text-left flex items-center px-2 py-1.5 rounded text-sm text-gray-700 hover:bg-gray-200"
+                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
                 onClick={() => { 
                   navigate('/');
                   if (isMobileView) closeSidebar();
                 }}
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
                 </svg>
-                Connections
+                <span className="font-medium">Connections</span>
               </button>
             </li>
             <li>
               <button 
-                className="w-full text-left flex items-center px-2 py-1.5 rounded text-sm text-gray-700 hover:bg-gray-200"
-                onClick={() => { 
-                  navigate('/settings');
-                  if (isMobileView) closeSidebar();
-                }}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                Settings
-              </button>
-            </li>
-            <li>
-              <button 
-                className="w-full text-left flex items-center px-2 py-1.5 rounded text-sm text-gray-700 hover:bg-gray-200"
+                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
                 onClick={() => window.open('https://portfolio-samar-gautam.netlify.app/', '_blank')}
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                Help
+                <span className="font-medium">Help & Support</span>
               </button>
             </li>
           </ul>
@@ -284,17 +269,28 @@ const Sidebar = ({
         {/* Databases section with folder structure */}
         <div className="p-4">
           <h2 
-            className="text-sm font-semibold text-gray-600 mb-2 hover:text-blue-800 cursor-pointer" 
+            className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors flex items-center justify-between group" 
             onClick={() => { 
               setExpandedDbs({});
               navigate("/databases");
               if (isMobileView) closeSidebar();
             }}
           >
-            DATABASES
+            <span>Databases</span>
+            <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </h2>
           
-          {databases.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center text-sm text-gray-500">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Loading databases...
+            </div>
+          ) : databases.length === 0 ? (
             <div className="text-sm text-gray-500 italic">No databases found</div>
           ) : (
             <ul className="space-y-1">
@@ -303,22 +299,26 @@ const Sidebar = ({
                   {/* Database item with expand/collapse functionality */}
                   <div className="flex flex-col">
                     <button
-                      className={`w-full text-left px-2 py-1 rounded text-sm ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
                         selectedDb === db.name
-                          ? 'bg-blue-100 text-blue-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-200'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium shadow-md'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                       onClick={() => handleDbSelect(db.name)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <div className="flex items-center min-w-0 flex-1">
+                          <svg className={`w-4 h-4 mr-2 flex-shrink-0 ${selectedDb === db.name ? 'text-white' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
                           </svg>
                           <span className="truncate">{db.name}</span>
                         </div>
                         <div 
-                          className="cursor-pointer hover:bg-gray-300 rounded p-1"
+                          className={`cursor-pointer rounded p-1 flex-shrink-0 ${
+                            selectedDb === db.name 
+                              ? 'hover:bg-white/20' 
+                              : 'hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
                           onClick={(e) => toggleDbExpand(db.name, e)}
                         >
                           {renderChevron(expandedDbs[db.name])}
@@ -337,7 +337,7 @@ const Sidebar = ({
                           transition={{ duration: 0.3 }}
                         >
                           {/* Show loading indicator while fetching collections */}
-                          {dbCollections[db.name] === undefined ? (
+                          {dbCollections[db.name] === null ? (
                             <motion.li 
                               className="text-xs text-gray-500 italic flex items-center"
                               initial={{ opacity: 0 }}
@@ -349,10 +349,10 @@ const Sidebar = ({
                               </svg>
                               Loading collections...
                             </motion.li>
-                          ) : dbCollections[db.name].length === 0 ? (
+                          ) : dbCollections[db.name]?.length === 0 ? (
                             <li className="text-xs text-gray-500 italic">No collections found</li>
                           ) : (
-                            dbCollections[db.name].map((coll) => (
+                            dbCollections[db.name]?.map((coll) => (
                               <motion.li 
                                 key={coll.name}
                                 initial={{ opacity: 0, x: -10 }}
@@ -360,15 +360,15 @@ const Sidebar = ({
                                 transition={{ duration: 0.2 }}
                               >
                                 <button
-                                  className={`w-full text-left px-2 py-1 rounded text-sm ${
+                                  className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
                                     selectedDb === db.name && selectedColl === coll.name
-                                      ? 'bg-blue-100 text-blue-700 font-medium'
-                                      : 'text-gray-700 hover:bg-gray-200'
+                                      ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white font-medium shadow-sm'
+                                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                                   }`}
                                   onClick={() => handleCollSelect(db.name, coll.name)}
                                 >
                                   <div className="flex items-center">
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <svg className={`w-4 h-4 mr-2 flex-shrink-0 ${selectedDb === db.name && selectedColl === coll.name ? 'text-white' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                     </svg>
                                     <span className="truncate">{coll.name}</span>

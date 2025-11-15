@@ -57,11 +57,26 @@ const MainLayout = () => {
    * Load connection info when component mounts
    */
   useEffect(() => {
-    // Get connection info from localStorage
-    const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
-    const activeConnection = savedConnections.find(conn => conn.active === true);
-    if (activeConnection) {
-      setConnectionName(activeConnection.name);
+    // Get connection info from localStorage (set by connection-context)
+    const connectionInfo = localStorage.getItem('connectionInfo');
+    
+    if (connectionInfo) {
+      try {
+        const connInfo = JSON.parse(connectionInfo);
+        setConnectionName(connInfo.name || 'MongoDB Connection');
+      } catch (error) {
+        console.error('Failed to parse connection info:', error);
+        setConnectionName('MongoDB Connection');
+      }
+    } else {
+      // Fallback: try to get from saved connections
+      const savedConnections = JSON.parse(localStorage.getItem('mongoConnections') || '[]');
+      if (savedConnections.length > 0) {
+        const mostRecent = savedConnections[0];
+        setConnectionName(mostRecent.name || 'MongoDB Connection');
+      } else {
+        setConnectionName('MongoDB Connection');
+      }
     }
     
     // Load databases
@@ -136,7 +151,7 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <Header />
 
@@ -158,7 +173,7 @@ const MainLayout = () => {
         </div>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

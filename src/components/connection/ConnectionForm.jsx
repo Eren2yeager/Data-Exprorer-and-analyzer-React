@@ -3,7 +3,7 @@
  * Form for creating and testing MongoDB connections with enhanced UI
  */
 import React, { useState } from 'react';
-import { connectionAPI } from '../../services/api';
+import { useConnection } from '../../../Contexts/connection-context';
 import { motion } from 'framer-motion';
 
 /**
@@ -13,6 +13,8 @@ import { motion } from 'framer-motion';
  * @param {Function} props.onError - Function called on connection error
  */
 const ConnectionForm = ({ onConnect, onError }) => {
+  const { connect } = useConnection();
+  
   // Form state
   const [connectionString, setConnectionString] = useState('');
   const [connectionName, setConnectionName] = useState('');
@@ -41,16 +43,16 @@ const ConnectionForm = ({ onConnect, onError }) => {
     setIsLoading(true);
     
     try {
-      const response = await connectionAPI.connect(connectionString);
+      const result = await connect(connectionString, connectionName || 'MongoDB Connection');
       
-      if (response.data.success) {
-        onConnect?.(connectionString, connectionName || 'MongoDB Connection', response.data.data);
+      if (result.success) {
+        onConnect?.(connectionString, connectionName || 'MongoDB Connection', result.data);
       } else {
-        onError?.(response.data.message || 'Failed to connect to MongoDB');
+        onError?.(result.error || 'Failed to connect to MongoDB');
       }
     } catch (error) {
       console.error('Connection error:', error);
-      onError?.(error.response?.data?.message || error.message || 'Failed to connect to MongoDB');
+      onError?.(error.message || 'Failed to connect to MongoDB');
     } finally {
       setIsLoading(false);
     }

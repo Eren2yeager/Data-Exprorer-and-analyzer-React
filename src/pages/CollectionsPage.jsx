@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collectionAPI } from '../services/api';
+import { useRefresh } from '../../Contexts/refresh-context';
 import {
   Button,
   Card,
@@ -23,6 +24,7 @@ import {
 const CollectionsPage = () => {
   const { dbName } = useParams();
   const navigate = useNavigate();
+  const { refreshCollections } = useRefresh();
   
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,7 @@ const CollectionsPage = () => {
         setNewCollName('');
         setShowCreateModal(false);
         loadCollections();
+        refreshCollections(); // Refresh sidebar
       } else {
         setError(response.data.message || 'Failed to create collection');
       }
@@ -102,6 +105,7 @@ const CollectionsPage = () => {
         setCollectionToRename(null);
         setNewRenameValue('');
         loadCollections();
+        refreshCollections(); // Refresh sidebar
       } else {
         setError(response.data.message || 'Failed to rename collection');
       }
@@ -118,6 +122,7 @@ const CollectionsPage = () => {
       if (response.data.success) {
         setDeleteModal(null);
         loadCollections();
+        refreshCollections(); // Refresh sidebar
       } else {
         setError(response.data.message || 'Failed to drop collection');
       }

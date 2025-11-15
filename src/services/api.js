@@ -58,21 +58,7 @@ export const connectionAPI = {
     return api.post('/connect', { connStr });
   },
 
-  /**
-   * Connect to local MongoDB
-   * @returns {Promise} - API response with session ID
-   */
-  connectLocal: () => {
-    return api.post('/connect/local');
-  },
 
-  /**
-   * Check if local MongoDB is available
-   * @returns {Promise} - API response
-   */
-  checkLocal: () => {
-    return api.get('/check-local');
-  },
 
   /**
    * Get list of active sessions

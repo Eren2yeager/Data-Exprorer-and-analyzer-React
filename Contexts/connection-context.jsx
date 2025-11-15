@@ -85,49 +85,7 @@ export const ConnectionProvider = ({ children }) => {
     }
   };
 
-  const connectLocal = async () => {
-    try {
-      const response = await connectionAPI.connectLocal();
-      
-      if (response.data.success) {
-        const newSessionId = response.data.data.sessionId;
-        const connInfo = {
-          name: 'Local MongoDB',
-          connStr: 'mongodb://localhost:27017',
-          serverInfo: response.data.data.serverInfo,
-          isLocal: true,
-          connectedAt: new Date().toISOString()
-        };
 
-        localStorage.setItem('mongoSessionId', newSessionId);
-        localStorage.setItem('connectionInfo', JSON.stringify(connInfo));
-
-        setSessionId(newSessionId);
-        setConnectionInfo(connInfo);
-        setIsConnected(true);
-
-        return { success: true, data: response.data.data };
-      } else {
-        return { success: false, error: response.data.message };
-      }
-    } catch (error) {
-      console.error('Local connection failed:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message || 'Local MongoDB not available' 
-      };
-    }
-  };
-
-  const checkLocalAvailability = async () => {
-    try {
-      const response = await connectionAPI.checkLocal();
-      return response.data.data.available;
-    } catch (error) {
-      console.error('Failed to check local MongoDB:', error);
-      return false;
-    }
-  };
 
   const disconnect = async () => {
     try {
@@ -156,8 +114,6 @@ export const ConnectionProvider = ({ children }) => {
     sessionId,
     loading,
     connect,
-    connectLocal,
-    checkLocalAvailability,
     disconnect,
     clearConnection,
     checkConnectionStatus

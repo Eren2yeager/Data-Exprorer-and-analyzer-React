@@ -6,6 +6,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useToast } from '../Contexts/toast-Contex';
 import { ConnectionProvider } from '../Contexts/connection-context';
+import { RefreshProvider } from '../Contexts/refresh-context';
 
 // Layout components
 import MainLayout from './components/layout/MainLayout';
@@ -34,8 +35,9 @@ function App() {
 
   return (
     <ConnectionProvider>
-      <Router>
-        <Routes>
+      <RefreshProvider>
+        <Router>
+          <Routes>
           {/* Connection page (outside main layout) */}
           <Route path="/" element={<ConnectionPage />} />
           
@@ -58,8 +60,9 @@ function App() {
           
           {/* Show NotFoundPage for unrecognized routes - Must be outside ProtectedRoute */}
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </RefreshProvider>
     </ConnectionProvider>
   );
 }

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+
+
 ::-webkit-scrollbar {
   /* visibility: hidden; */
   width: 10px;

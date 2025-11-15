@@ -114,7 +114,9 @@ const Sidebar = ({
    * @param {String} dbName - Database name
    */
   const handleDbSelect = (dbName) => {
-    if (onSelectDatabase) {
+    // Only call onSelectDatabase if it's a different database
+    // This prevents re-fetching when clicking the same database
+    if (onSelectDatabase && selectedDb !== dbName) {
       onSelectDatabase(dbName);
     }
     
@@ -219,55 +221,17 @@ const Sidebar = ({
 
       {/* Sidebar */}
       <motion.div
-        className={`bg-white dark:bg-gray-800 w-64 h-full overflow-y-auto border-r border-gray-200 dark:border-gray-700 shadow-lg ${
+        className={`bg-white dark:bg-gray-800 w-64 h-full border-r border-gray-200 dark:border-gray-700 shadow-lg flex flex-col ${
           isMobileView ? 'fixed left-0 top-0 bottom-0 shadow-2xl z-50' : 'relative z-20'
         }`}
         initial="closed"
         animate={isSidebarOpen ? "open" : "closed"}
         variants={sidebarVariants}
       >
-        {/* Connection info */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
-          <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connected To</h2>
-          <div className="mt-2 text-sm text-gray-900 dark:text-white flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            <span className="truncate font-medium">{connectionName || "MongoDB Connection"}</span>
-          </div>
-        </div>
 
-        {/* Navigation Links */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <ul className="space-y-1">
-            <li>
-              <button 
-                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
-                onClick={() => { 
-                  navigate('/');
-                  if (isMobileView) closeSidebar();
-                }}
-              >
-                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
-                </svg>
-                <span className="font-medium">Connections</span>
-              </button>
-            </li>
-            <li>
-              <button 
-                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
-                onClick={() => window.open('https://portfolio-samar-gautam.netlify.app/', '_blank')}
-              >
-                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span className="font-medium">Help & Support</span>
-              </button>
-            </li>
-          </ul>
-        </div>
 
-        {/* Databases section with folder structure */}
-        <div className="p-4">
+        {/* Databases section with folder structure - scrollable */}
+        <div className="p-4 flex-1 overflow-y-auto">
           <h2 
             className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors flex items-center justify-between group" 
             onClick={() => { 
@@ -385,6 +349,40 @@ const Sidebar = ({
               ))}
             </ul>
           )}
+        </div>
+
+        {/* Navigation Links at Bottom */}
+        <div className="mt-auto p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <ul className="space-y-1">
+
+           
+
+            <li>
+              <button 
+                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+                onClick={() => { 
+                  navigate('/');
+                  if (isMobileView) closeSidebar();
+                }}
+              >
+                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                </svg>
+                <span className="font-medium">Connections</span>
+              </button>
+            </li>
+            <li>
+              <button 
+                className="w-full text-left flex items-center px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
+                onClick={() => window.open('https://portfolio-samar-gautam.netlify.app/', '_blank')}
+              >
+                <svg className="w-5 h-5 mr-3 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span className="font-medium">Help & Support</span>
+              </button>
+            </li>
+          </ul>
         </div>
 
         {/* Close button - only visible on mobile */}

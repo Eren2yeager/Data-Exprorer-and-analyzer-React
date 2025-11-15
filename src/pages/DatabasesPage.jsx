@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { databaseAPI } from '../services/api';
 import { useConnection } from '../../Contexts/connection-context';
+import { useRefresh } from '../../Contexts/refresh-context';
 import {
   Button,
   Card,
@@ -27,6 +28,7 @@ import {
 const DatabasesPage = () => {
   const navigate = useNavigate();
   const { connectionInfo, disconnect } = useConnection();
+  const { refreshDatabases } = useRefresh();
   
   // State
   const [databases, setDatabases] = useState([]);
@@ -89,6 +91,7 @@ const DatabasesPage = () => {
         setShowCreateModal(false);
         setNewDbName('');
         loadDatabases();
+        refreshDatabases(); // Refresh sidebar
       } else {
         setError(response.data.message || 'Failed to create database');
       }
@@ -106,6 +109,7 @@ const DatabasesPage = () => {
       if (response.data.success) {
         setDeleteModal(null);
         loadDatabases();
+        refreshDatabases(); // Refresh sidebar
       } else {
         setError(response.data.message || 'Failed to delete database');
       }

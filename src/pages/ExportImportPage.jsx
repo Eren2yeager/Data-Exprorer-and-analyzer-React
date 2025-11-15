@@ -6,17 +6,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { exportImportAPI } from '../services/api';
 import { useToast } from '../../Contexts/toast-Contex';
-import { Card, Button, Input, Badge, LoadingSkeleton } from '../components/ui';
-import { FiDownload, FiUpload, FiFile, FiDatabase, FiAlertCircle, FiCheck } from 'react-icons/fi';
+import { Card, Button, Input, LoadingSkeleton, EditableJsonViewer, JsonViewer } from '../components/ui';
+import { FiDownload, FiUpload, FiFile, FiDatabase, FiAlertCircle } from 'react-icons/fi';
 import CollectionNav from '../components/navigation/CollectionNav';
 
 const ExportImportPage = () => {
   const { dbName, collName } = useParams();
-  const { showToast } = useToast();
+  const { showSuccess, showError, showInfo, showWarning } = useToast();
 
   const [activeTab, setActiveTab] = useState('export');
   const [exportFormat, setExportFormat] = useState('json');
-  const [exportFilter, setExportFilter] = useState('{}');
+  const [exportFilter, setExportFilter] = useState({});
   const [exportFields, setExportFields] = useState('');
   const [exportLimit, setExportLimit] = useState(1000);
   const [exportInfo, setExportInfo] = useState(null);
@@ -48,13 +48,8 @@ const ExportImportPage = () => {
   const handleExport = async () => {
     try {
       setExporting(true);
-      let filter = {};
-      try {
-        filter = JSON.parse(exportFilter);
-      } catch (e) {
-        showToast('Invalid filter JSON', 'error');
-        return;
-      }
+      // exportFilter is already an object from EditableJsonViewer
+      const filter = exportFilter;
 
       let response;
       if (exportFormat === 'json') {
@@ -78,9 +73,9 @@ const ExportImportPage = () => {
       a.download = `${collName}-export-${Date.now()}.${exportFormat}`;
       a.click();
       
-      showToast(`Exported ${response.data.data.count} documents`, 'success');
+      showSuccess(`Exported ${response.data.data.count} documents`);
     } catch (error) {
-      showToast(error.response?.data?.message || 'Export failed', 'error');
+      showError(error.response?.data?.message || 'Export failed');
     } finally {
       setExporting(false);
     }
@@ -90,39 +85,91 @@ const ExportImportPage = () => {
     try {
       setImporting(true);
       
+      // Check if we have data
+      if (!importData.trim()) {
+        showError('Please enter JSON data or select a file');
+        return;
+      }
+      
       let data;
-      if (importFile) {
-        // Read file
-        const text = await importFile.text();
-        if (importFile.name.endsWith('.json')) {
-          data = JSON.parse(text);
-        } else {
-          // CSV import
-          const response = await exportImportAPI.importCSV(dbName, collName, text, importMode);
-          showToast(`Imported ${response.data.data.insertedCount} documents`, 'success');
+      
+      // Check if it's CSV (from file name or content)
+      if (importFile && importFile.name.endsWith('.csv')) {
+        // CSV import
+        try {
+          const response = await exportImportAPI.importCSV(dbName, collName, importData, importMode);
+          showSuccess(`Imported ${response.data.data.insertedCount} documents`);
           setImportFile(null);
           setImportData('');
           return;
+        } catch (csvError) {
+          showError(csvError.response?.data?.message || 'Failed to import CSV');
+          return;
         }
-      } else {
+      }
+      
+      // JSON import (from file or textarea)
+      try {
         data = JSON.parse(importData);
+      } catch (parseError) {
+        showError('Invalid JSON format');
+        return;
       }
 
+      // Validate data is an array
+      if (!Array.isArray(data)) {
+        showError('Data must be an array of documents');
+        return;
+      }
+
+      if (data.length === 0) {
+        showError('No documents to import');
+        return;
+      }
+
+      // Import JSON data
       const response = await exportImportAPI.importJSON(dbName, collName, data, importMode);
-      showToast(`Imported ${response.data.data.insertedCount} documents`, 'success');
+      showSuccess(`Imported ${response.data.data.insertedCount} documents`);
       setImportFile(null);
       setImportData('');
+      
     } catch (error) {
-      showToast(error.response?.data?.message || 'Import failed', 'error');
+      console.error('Import error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Import failed';
+      showError(errorMessage);
     } finally {
       setImporting(false);
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setImportFile(file);
+      
+      // Read file content and populate textarea
+      try {
+        const text = await file.text();
+        
+        if (file.name.endsWith('.json')) {
+          // For JSON, try to format it nicely
+          try {
+            const parsed = JSON.parse(text);
+            setImportData(JSON.stringify(parsed, null, 2));
+          } catch (parseError) {
+            // If parsing fails, just show raw text
+            setImportData(text);
+          }
+        } else if (file.name.endsWith('.csv')) {
+          // For CSV, just show the raw content
+          setImportData(text);
+        } else {
+          setImportData(text);
+        }
+      } catch (error) {
+        console.error('Error reading file:', error);
+        showError('Failed to read file');
+      }
     }
   };
 
@@ -135,7 +182,7 @@ const ExportImportPage = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 w-full ">
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent truncate">
@@ -147,7 +194,7 @@ const ExportImportPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4 md:mb-6">
+      <div className="flex justify-center gap-2 mb-4 md:mb-6">
         <Button
           variant={activeTab === 'export' ? 'primary' : 'outline'}
           onClick={() => setActiveTab('export')}
@@ -228,15 +275,17 @@ const ExportImportPage = () => {
               {/* Filter */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Filter (MongoDB Query)
+                  Filter (MongoDB Query - Click to edit)
                 </label>
-                <textarea
-                  className="w-full p-2 md:p-3 border border-gray-300 rounded-lg font-mono text-xs md:text-sm overflow-auto"
-                  rows={4}
-                  value={exportFilter}
-                  onChange={(e) => setExportFilter(e.target.value)}
-                  placeholder='{"status": "active"}'
-                />
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-3 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[120px] max-h-[300px] overflow-auto">
+                  <EditableJsonViewer
+                    data={exportFilter}
+                    onChange={setExportFilter}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Example: Add field "status" with value "active" to filter documents
+                </p>
               </div>
 
               {/* CSV Fields */}
@@ -353,17 +402,37 @@ const ExportImportPage = () => {
 
               {/* Or Paste Data */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Or Paste JSON Data
-                </label>
-                <textarea
-                  className="w-full p-2 md:p-3 border border-gray-300 rounded-lg font-mono text-xs md:text-sm overflow-auto"
-                  rows={8}
-                  value={importData}
-                  onChange={(e) => setImportData(e.target.value)}
-                  placeholder='[{"name": "John", "age": 30}, {"name": "Jane", "age": 25}]'
-                  disabled={!!importFile}
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium">
+                    {importFile ? 'File Content Preview' : 'Or Paste JSON Data'}
+                  </label>
+                  {importFile && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setImportFile(null);
+                        setImportData('');
+                      }}
+                    >
+                      Clear File
+                    </Button>
+                  )}
+                </div>
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-3 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[200px] max-h-[400px] overflow-auto">
+                  {importData ? (
+                    <JsonViewer data={typeof importData === 'string' ? (() => {
+                      try {
+                        return JSON.parse(importData);
+                      } catch {
+                        return { error: 'Invalid JSON', raw: importData };
+                      }
+                    })() : importData} />
+                  ) : (
+                    <p className="text-gray-400 text-sm">Paste JSON data or upload a file to preview</p>
+                  )}
+                </div>
+
               </div>
 
               {/* Import Button */}

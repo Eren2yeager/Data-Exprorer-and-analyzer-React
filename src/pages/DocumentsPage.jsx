@@ -14,13 +14,13 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-  Input,
   Textarea,
   Modal,
   Badge,
   TableSkeleton,
-  EmptyState,
   NoDataEmptyState,
+  JsonViewer,
+  EditableJsonViewer,
 } from '../components/ui';
 import CollectionNav from '../components/navigation/CollectionNav';
 
@@ -33,8 +33,8 @@ const DocumentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('json');
-  const [queryFilter, setQueryFilter] = useState('{}');
-  const [sortQuery, setSortQuery] = useState('{}');
+  const [queryFilter, setQueryFilter] = useState({});
+  const [sortQuery, setSortQuery] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalDocuments, setTotalDocuments] = useState(0);
@@ -43,8 +43,9 @@ const DocumentsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
-  const [newDocument, setNewDocument] = useState('{}');
-  const [editDocument, setEditDocument] = useState('');
+  const [deleteSelectedModal, setDeleteSelectedModal] = useState(false);
+  const [newDocument, setNewDocument] = useState({});
+  const [editDocument, setEditDocument] = useState(null);
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [collectionStats, setCollectionStats] = useState(null);
@@ -53,6 +54,8 @@ const DocumentsPage = () => {
   useEffect(() => {
     loadDocuments();
     loadCollectionStats();
+    // Clear selected documents when collection changes
+    setSelectedDocuments(new Set());
   }, [dbName, collName, currentPage, pageSize]);
 
   const loadDocuments = async () => {
@@ -60,28 +63,9 @@ const DocumentsPage = () => {
     setError(null);
     
     try {
-      let filter = {};
-      let sort = {};
-      
-      if (queryFilter.trim() && queryFilter !== '{}') {
-        try {
-          filter = JSON.parse(queryFilter);
-        } catch (e) {
-          setError('Invalid filter JSON');
-          setLoading(false);
-          return;
-        }
-      }
-      
-      if (sortQuery.trim() && sortQuery !== '{}') {
-        try {
-          sort = JSON.parse(sortQuery);
-        } catch (e) {
-          setError('Invalid sort JSON');
-          setLoading(false);
-          return;
-        }
-      }
+      // queryFilter and sortQuery are already objects from EditableJsonViewer
+      const filter = queryFilter;
+      const sort = sortQuery;
       
       const response = await documentAPI.queryDocuments(dbName, collName, {
         filter,
@@ -120,20 +104,12 @@ const DocumentsPage = () => {
     setCreating(true);
     
     try {
-      let docData;
-      try {
-        docData = JSON.parse(newDocument);
-      } catch (e) {
-        setError('Invalid JSON format');
-        setCreating(false);
-        return;
-      }
-      
-      const response = await documentAPI.insertDocuments(dbName, collName, docData);
+      // newDocument is already an object from EditableJsonViewer
+      const response = await documentAPI.insertDocuments(dbName, collName, newDocument);
       
       if (response.data.success) {
         setShowCreateModal(false);
-        setNewDocument('{}');
+        setNewDocument({});
         loadDocuments();
         loadCollectionStats();
       } else {
@@ -153,23 +129,15 @@ const DocumentsPage = () => {
     setUpdating(true);
     
     try {
-      let updateData;
-      try {
-        updateData = JSON.parse(editDocument);
-      } catch (e) {
-        setError('Invalid JSON format');
-        setUpdating(false);
-        return;
-      }
-      
-      // Remove _id field as it's immutable in MongoDB
-      const { _id, ...dataWithoutId } = updateData;
+      // editDocument is already an object from EditableJsonViewer
+      // Remove _id before sending (MongoDB doesn't allow modifying _id)
+      const { _id, ...dataWithoutId } = editDocument;
       
       const response = await documentAPI.updateDocument(dbName, collName, showEditModal._id, dataWithoutId);
       
       if (response.data.success) {
         setShowEditModal(null);
-        setEditDocument('');
+        setEditDocument(null);
         loadDocuments();
       } else {
         setError(response.data.message || 'Failed to update document');
@@ -207,10 +175,12 @@ const DocumentsPage = () => {
       
       await Promise.all(deletePromises);
       setSelectedDocuments(new Set());
+      setDeleteSelectedModal(false);
       loadDocuments();
       loadCollectionStats();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to delete selected documents');
+      setDeleteSelectedModal(false);
     }
   };
 
@@ -357,25 +327,31 @@ const DocumentsPage = () => {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Filter (JSON)
+                        Filter (Click to edit)
                       </label>
-                      <Textarea
-                        value={queryFilter}
-                        onChange={(e) => setQueryFilter(e.target.value)}
-                        placeholder='{"status": "active"}'
-                        rows={3}
-                      />
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-3 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[100px] max-h-[300px] overflow-auto">
+                        <EditableJsonViewer
+                          data={queryFilter}
+                          onChange={setQueryFilter}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Example: Add field "status" with value "active"
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Sort (JSON)
+                        Sort (Click to edit)
                       </label>
-                      <Textarea
-                        value={sortQuery}
-                        onChange={(e) => setSortQuery(e.target.value)}
-                        placeholder='{"createdAt": -1}'
-                        rows={2}
-                      />
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-3 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[80px] max-h-[200px] overflow-auto">
+                        <EditableJsonViewer
+                          data={sortQuery}
+                          onChange={setSortQuery}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Example: Add field "createdAt" with value -1 (descending) or 1 (ascending)
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -386,8 +362,8 @@ const DocumentsPage = () => {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setQueryFilter('{}');
-                      setSortQuery('{}');
+                      setQueryFilter({});
+                      setSortQuery({});
                     }}
                   >
                     Reset
@@ -465,7 +441,7 @@ const DocumentsPage = () => {
                 <span className="text-sm text-gray-600 dark:text-gray-400">
                   {selectedDocuments.size} selected
                 </span>
-                <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
+                <Button variant="danger" size="sm" onClick={() => setDeleteSelectedModal(true)}>
                   Delete Selected
                 </Button>
               </motion.div>
@@ -494,7 +470,7 @@ const DocumentsPage = () => {
           <div className="space-y-4">
             {documents.map((doc, index) => (
               <motion.div
-                key={doc._id}
+                key={index}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -510,7 +486,9 @@ const DocumentsPage = () => {
                           className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
                         <div>
-                          <CardTitle className="text-sm font-mono truncate w-full">{doc._id}</CardTitle>
+                          <CardTitle className="text-sm font-mono truncate w-full">
+                            {typeof doc._id === 'object' ? JSON.stringify(doc._id) : String(doc._id)}
+                          </CardTitle>
                           <CardDescription className="text-xs">Document ID</CardDescription>
                         </div>
                       </div>
@@ -518,10 +496,32 @@ const DocumentsPage = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(JSON.stringify(doc, null, 2));
+                              // Show success feedback (you can add a toast notification here)
+                              const btn = event.currentTarget;
+                              const originalTitle = btn.title;
+                              btn.title = 'Copied!';
+                              setTimeout(() => { btn.title = originalTitle; }, 2000);
+                            } catch (err) {
+                              console.error('Failed to copy:', err);
+                            }
+                          }}
+                          title="Copy document to clipboard"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => {
                             setShowEditModal(doc);
-                            setEditDocument(formatJSON(doc));
+                            setEditDocument(doc);
                           }}
+                          title="Edit document"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -531,6 +531,7 @@ const DocumentsPage = () => {
                           variant="danger"
                           size="sm"
                           onClick={() => setDeleteModal(doc)}
+                          title="Delete document"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -540,9 +541,9 @@ const DocumentsPage = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <pre className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto text-sm">
-                      <code className="text-gray-800 dark:text-gray-200">{formatJSON(doc)}</code>
-                    </pre>
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-700">
+                      <JsonViewer data={doc} />
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -596,9 +597,30 @@ const DocumentsPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={async (event) => {
+                              try {
+                                await navigator.clipboard.writeText(JSON.stringify(doc, null, 2));
+                                const btn = event.currentTarget;
+                                const originalText = btn.textContent;
+                                btn.textContent = 'Copied!';
+                                setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+                              } catch (err) {
+                                console.error('Failed to copy:', err);
+                              }
+                            }}
+                            title="Copy document to clipboard"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
                               setShowEditModal(doc);
-                              setEditDocument(formatJSON(doc));
+                              setEditDocument(doc);
                             }}
                           >
                             Edit
@@ -633,7 +655,7 @@ const DocumentsPage = () => {
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-white bg-white dark:bg-gray-800 text-sm"
               >
                 <option value={10}>10 per page</option>
                 <option value={25}>25 per page</option>
@@ -667,27 +689,37 @@ const DocumentsPage = () => {
       {/* Create Document Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          setNewDocument({});
+        }}
         title="Create New Document"
+        size="full"
       >
         <form onSubmit={handleCreateDocument}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Document JSON
+              Document Editor (Click to add fields and values)
             </label>
-            <Textarea
-              value={newDocument}
-              onChange={(e) => setNewDocument(e.target.value)}
-              placeholder='{"name": "John Doe", "email": "john@example.com"}'
-              rows={10}
-              required
-            />
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 h-[calc(100vh-300px)] overflow-auto">
+              <EditableJsonViewer 
+                data={newDocument} 
+                onChange={setNewDocument}
+              />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              💡 Click "+ Add field" to start building your document. Click values to edit them. Use Tab/Enter to save, Escape to cancel.
+            </p>
           </div>
+          
           <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => {
+                setShowCreateModal(false);
+                setNewDocument({});
+              }}
             >
               Cancel
             </Button>
@@ -701,26 +733,39 @@ const DocumentsPage = () => {
       {/* Edit Document Modal */}
       <Modal
         isOpen={!!showEditModal}
-        onClose={() => setShowEditModal(null)}
+        onClose={() => {
+          setShowEditModal(null);
+          setEditDocument(null);
+        }}
         title="Edit Document"
+        size="full"
       >
         <form onSubmit={handleUpdateDocument}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Document JSON
+              Document Editor (Click values to edit)
             </label>
-            <Textarea
-              value={editDocument}
-              onChange={(e) => setEditDocument(e.target.value)}
-              rows={15}
-              required
-            />
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 h-[calc(100vh-300px)] overflow-auto">
+              {editDocument && (
+                <EditableJsonViewer 
+                  data={editDocument} 
+                  onChange={setEditDocument}
+                />
+              )}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              💡 Click on any value to edit it. Hover over fields to see delete option (except _id). Use Tab/Enter to save, Escape to cancel.
+            </p>
           </div>
+          
           <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowEditModal(null)}
+              onClick={() => {
+                setShowEditModal(null);
+                setEditDocument(null);
+              }}
             >
               Cancel
             </Button>
@@ -757,6 +802,41 @@ const DocumentsPage = () => {
             onClick={() => handleDeleteDocument(deleteModal._id)}
           >
             Delete Document
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete Selected Confirmation Modal */}
+      <Modal
+        isOpen={deleteSelectedModal}
+        onClose={() => setDeleteSelectedModal(false)}
+        title="Delete Multiple Documents"
+      >
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          Are you sure you want to delete {selectedDocuments.size} document{selectedDocuments.size !== 1 ? 's' : ''}? This action cannot be undone.
+        </p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-lg mb-6">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium text-red-800 dark:text-red-200">
+              Warning: This will permanently delete {selectedDocuments.size} document{selectedDocuments.size !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteSelectedModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleDeleteSelected}
+          >
+            Delete {selectedDocuments.size} Document{selectedDocuments.size !== 1 ? 's' : ''}
           </Button>
         </div>
       </Modal>

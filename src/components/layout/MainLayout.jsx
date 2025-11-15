@@ -8,6 +8,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import { databaseAPI, collectionAPI } from '../../services/api';
 import { useSidebar } from '../../../Contexts/sidebar-context';
+import { useRefresh } from '../../../Contexts/refresh-context';
 
 /**
  * MainLayout component that provides the application structure
@@ -21,12 +22,16 @@ const MainLayout = () => {
   // Get sidebar state from context
   const { isSidebarOpen } = useSidebar();
   
+  // Get refresh trigger from context
+  const { refreshTrigger } = useRefresh();
+  
   // Application state
   const [databases, setDatabases] = useState([]);
   const [collections, setCollections] = useState([]);
   const [selectedDb, setSelectedDb] = useState(null);
   const [selectedColl, setSelectedColl] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingDatabases, setLoadingDatabases] = useState(false);
+  const [loadingCollections, setLoadingCollections] = useState(false);
   const [connectionName, setConnectionName] = useState("");
 
   /**
@@ -84,6 +89,18 @@ const MainLayout = () => {
   }, []);
 
   /**
+   * Refresh databases when refreshTrigger changes
+   */
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      loadDatabases();
+      if (selectedDb) {
+        loadCollections(selectedDb);
+      }
+    }
+  }, [refreshTrigger]);
+
+  /**
    * Load collections when database is selected
    */
   useEffect(() => {
@@ -98,7 +115,7 @@ const MainLayout = () => {
    * Load databases from API
    */
   const loadDatabases = async () => {
-    setLoading(true);
+    setLoadingDatabases(true);
     try {
       const response = await databaseAPI.listDatabases();
       if (response.data.success) {
@@ -107,7 +124,7 @@ const MainLayout = () => {
     } catch (error) {
       console.error('Failed to load databases:', error);
     } finally {
-      setLoading(false);
+      setLoadingDatabases(false);
     }
   };
 
@@ -116,7 +133,7 @@ const MainLayout = () => {
    * @param {String} dbName - Database name
    */
   const loadCollections = async (dbName) => {
-    setLoading(true);
+    setLoadingCollections(true);
     try {
       const response = await collectionAPI.listCollections(dbName);
       if (response.data.success) {
@@ -125,7 +142,7 @@ const MainLayout = () => {
     } catch (error) {
       console.error(`Failed to load collections for ${dbName}:`, error);
     } finally {
-      setLoading(false);
+      setLoadingCollections(false);
     }
   };
 
@@ -167,7 +184,7 @@ const MainLayout = () => {
             onSelectDatabase={handleSelectDatabase}
             onSelectCollection={handleSelectCollection}
             onGetCollections={loadCollections}
-            loading={loading}
+            loading={loadingDatabases}
             connectionName={connectionName}
           />
         </div>

@@ -92,11 +92,7 @@ const Header = () => {
         
         {/* Right side of header */}
         <div className="flex items-center gap-3">
-          {/* Connection Status */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-300">Connected</span>
-          </div>
+
 
           {/* Quick Actions */}
           <div className="hidden md:flex items-center gap-2">

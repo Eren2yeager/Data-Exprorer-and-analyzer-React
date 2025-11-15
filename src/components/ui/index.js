@@ -10,3 +10,5 @@ export { default as Modal } from './Modal';
 export { default as Badge, DotBadge } from './Badge';
 export { default as LoadingSkeleton, CardSkeleton, TableSkeleton, ListSkeleton } from './LoadingSkeleton';
 export { default as EmptyState, NoDataEmptyState, NoResultsEmptyState, ErrorEmptyState } from './EmptyState';
+export { default as JsonViewer } from './JsonViewer';
+export { default as EditableJsonViewer } from './EditableJsonViewer';

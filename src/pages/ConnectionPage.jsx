@@ -2,7 +2,7 @@
  * ConnectionPage Component - Redesigned
  * Modern MongoDB connection management with beautiful UI
  */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConnection } from '../../Contexts/connection-context';
@@ -14,32 +14,30 @@ import {
   CardDescription,
   CardContent,
   Input,
-  Badge,
   EmptyState,
   Modal,
 } from '../components/ui';
 
 const ConnectionPage = () => {
   const navigate = useNavigate();
-  const { connect, connectLocal, checkLocalAvailability } = useConnection();
+  const { connect } = useConnection();
   
   // State
   const [connectionString, setConnectionString] = useState('');
   const [connectionName, setConnectionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingLocal, setLoadingLocal] = useState(false);
+
   const [loadingSaved, setLoadingSaved] = useState(null); // Track which saved connection is loading
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [savedConnections, setSavedConnections] = useState([]);
-  const [localAvailable, setLocalAvailable] = useState(false);
+
   const [deleteModal, setDeleteModal] = useState(null);
   const [editingConnection, setEditingConnection] = useState(null);
 
   // Load saved connections and check local MongoDB
   useEffect(() => {
     loadSavedConnections();
-    checkLocal();
   }, []);
 
   // Auto-dismiss notifications
@@ -58,10 +56,7 @@ const ConnectionPage = () => {
     setSavedConnections(saved);
   };
 
-  const checkLocal = async () => {
-    const available = await checkLocalAvailability();
-    setLocalAvailable(available);
-  };
+
 
   const handleConnect = async (e) => {
     e.preventDefault();
@@ -106,26 +101,6 @@ const ConnectionPage = () => {
       setError(err.message || 'Connection failed');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleConnectLocal = async () => {
-    setLoadingLocal(true);
-    setError(null);
-
-    try {
-      const result = await connectLocal();
-      
-      if (result.success) {
-        setSuccess('Connected to local MongoDB!');
-        setTimeout(() => navigate('/databases'), 1000);
-      } else {
-        setError(result.error || 'Local MongoDB not available');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to connect to local MongoDB');
-    } finally {
-      setLoadingLocal(false);
     }
   };
 
@@ -298,7 +273,7 @@ const ConnectionPage = () => {
 
                   <Input
                     label="Connection String"
-                    placeholder="mongodb://localhost:27017 or mongodb+srv://..."
+                    placeholder="mongodb+srv://username:password@cluster.mongodb.net/database"
                     value={connectionString}
                     onChange={(e) => setConnectionString(e.target.value)}
                     required
@@ -323,28 +298,7 @@ const ConnectionPage = () => {
                   </div>
                 </form>
 
-                {/* Quick Connect to Local */}
-                {localAvailable && (
-                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      Quick connect to local MongoDB
-                    </p>
-                    <Button
-                      onClick={handleConnectLocal}
-                      variant="success"
-                      gradient
-                      loading={loadingLocal}
-                      fullWidth
-                      icon={
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                      }
-                    >
-                      Connect to localhost:27017
-                    </Button>
-                  </div>
-                )}
+
               </CardContent>
             </Card>
           </motion.div>

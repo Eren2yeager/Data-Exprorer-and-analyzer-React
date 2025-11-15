@@ -6,14 +6,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { aggregationAPI } from '../services/api';
 import { useToast } from '../../Contexts/toast-Contex';
-import { Card, Button, Input, EmptyState, LoadingSkeleton, Badge } from '../components/ui';
+import { Card, Button, EmptyState, LoadingSkeleton, Badge, JsonViewer, EditableJsonViewer } from '../components/ui';
 import { FiPlus, FiTrash2, FiPlay, FiCode, FiCopy, FiDownload, FiAlertCircle } from 'react-icons/fi';
 import CollectionNav from '../components/navigation/CollectionNav';
 
 const AggregationPage = () => {
   const { dbName, collName } = useParams();
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const { showSuccess, showError, showInfo, showWarning } = useToast();
 
   const [pipeline, setPipeline] = useState([]);
   const [results, setResults] = useState(null);
@@ -65,14 +65,9 @@ const AggregationPage = () => {
   };
 
   const updateStage = (index, value) => {
-    try {
-      const parsed = JSON.parse(value);
-      const newPipeline = [...pipeline];
-      newPipeline[index] = parsed;
-      setPipeline(newPipeline);
-    } catch (error) {
-      // Invalid JSON, don't update
-    }
+    const newPipeline = [...pipeline];
+    newPipeline[index] = value;
+    setPipeline(newPipeline);
   };
 
   const removeStage = (index) => {
@@ -81,7 +76,7 @@ const AggregationPage = () => {
 
   const executePipeline = async () => {
     if (pipeline.length === 0) {
-      showToast('Please add at least one stage to the pipeline', 'warning');
+      showWarning('Please add at least one stage to the pipeline');
       return;
     }
 
@@ -89,9 +84,9 @@ const AggregationPage = () => {
       setExecuting(true);
       const response = await aggregationAPI.execute(dbName, collName, pipeline);
       setResults(response.data.data);
-      showToast('Pipeline executed successfully', 'success');
+      showSuccess('Pipeline executed successfully');
     } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to execute pipeline', 'error');
+      showError(error.response?.data?.message || 'Failed to execute pipeline');
     } finally {
       setExecuting(false);
     }
@@ -99,7 +94,7 @@ const AggregationPage = () => {
 
   const copyPipeline = () => {
     navigator.clipboard.writeText(JSON.stringify(pipeline, null, 2));
-    showToast('Pipeline copied to clipboard', 'success');
+    showSuccess('Pipeline copied to clipboard');
   };
 
   const exportResults = () => {
@@ -110,13 +105,13 @@ const AggregationPage = () => {
     a.href = url;
     a.download = `aggregation-results-${Date.now()}.json`;
     a.click();
-    showToast('Results exported', 'success');
+    showSuccess('Results exported');
   };
 
   const applySuggestion = (suggestion) => {
     setPipeline(suggestion.pipeline);
     setShowSuggestions(false);
-    showToast(`Applied: ${suggestion.name}`, 'success');
+    showSuccess(`Applied: ${suggestion.name}`);
   };
 
   if (loading) {
@@ -224,13 +219,12 @@ const AggregationPage = () => {
                         <FiTrash2 />
                       </Button>
                     </div>
-                    <textarea
-                      className="w-full p-2 md:p-3 border border-gray-300 rounded-lg font-mono text-xs md:text-sm overflow-auto"
-                      rows={6}
-                      value={JSON.stringify(stage, null, 2)}
-                      onChange={(e) => updateStage(index, e.target.value)}
-                      placeholder="Enter stage JSON..."
-                    />
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-3 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[150px] max-h-[400px] overflow-auto">
+                      <EditableJsonViewer
+                        data={stage}
+                        onChange={(newValue) => updateStage(index, newValue)}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -257,10 +251,8 @@ const AggregationPage = () => {
                   Export
                 </Button>
               </div>
-              <div className="bg-gray-50 rounded-lg p-2 md:p-4 max-h-96 overflow-auto">
-                <pre className="text-xs md:text-sm font-mono whitespace-pre-wrap break-words">
-                  {JSON.stringify(results.results, null, 2)}
-                </pre>
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
+                <JsonViewer data={results.results} />
               </div>
             </Card>
           )}

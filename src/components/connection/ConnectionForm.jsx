@@ -23,9 +23,8 @@ const ConnectionForm = ({ onConnect, onError }) => {
   
   // Sample connection strings
   const sampleConnections = [
-    { name: 'Local MongoDB', uri: 'mongodb://127.0.0.1:27017/' },
-    { name: 'Atlas Sample', uri: 'mongodb+srv://username:password@cluster.mongodb.net/test' },
-    { name: 'Replica Set', uri: 'mongodb://localhost:27017,localhost:27018,localhost:27019/test?replicaSet=rs0' }
+    { name: 'MongoDB Atlas', uri: 'mongodb+srv://username:password@cluster.mongodb.net/database' },
+    { name: 'MongoDB Atlas (Specific DB)', uri: 'mongodb+srv://username:password@cluster.mongodb.net/myDatabase?retryWrites=true&w=majority' }
   ];
 
   /**
@@ -148,7 +147,7 @@ const ConnectionForm = ({ onConnect, onError }) => {
               value={connectionString}
               onChange={(e) => setConnectionString(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200 shadow-sm"
-              placeholder="mongodb://127.0.0.1:27017/"
+              placeholder="mongodb+srv://username:password@cluster.mongodb.net/database"
               required
             />
           </div>

@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { aggregationAPI } from '../services/api';
 import { useToast } from '../../Contexts/toast-Contex';
-import { Card, Button, EmptyState, LoadingSkeleton, Badge, JsonViewer, EditableJsonViewer } from '../components/ui';
+import { Card, Button, EmptyState, CardSkeleton, Badge, JsonViewer, EditableJsonViewer } from '../components/ui';
 import { FiPlus, FiTrash2, FiPlay, FiCode, FiCopy, FiDownload, FiAlertCircle } from 'react-icons/fi';
 import CollectionNav from '../components/navigation/CollectionNav';
 
@@ -117,7 +117,7 @@ const AggregationPage = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <LoadingSkeleton count={3} />
+        <CardSkeleton count={3} />
       </div>
     );
   }

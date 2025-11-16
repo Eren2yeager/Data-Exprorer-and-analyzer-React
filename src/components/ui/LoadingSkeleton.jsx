@@ -48,7 +48,7 @@ export const CardSkeleton = ({ count = 1 }) => (
     {Array.from({ length: count }).map((_, index) => (
       <div
         key={index}
-        className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"
+        className="bg-white mb-5 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"
       >
         <LoadingSkeleton variant="title" className="mb-4" />
         <LoadingSkeleton variant="text" count={3} className="mb-2" />

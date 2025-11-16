@@ -1,10 +1,11 @@
 /**
  * EditableJsonViewer Component
  * Interactive JSON editor with inline editing like MongoDB Compass
+ * Includes optional raw JSON editor mode for copy/paste
  */
 import React, { useState } from 'react';
 
-const EditableJsonViewer = ({ data, onChange, level = 0 }) => {
+const EditableJsonViewer = ({ data, onChange, level = 0, showRawEditor = true }) => {
   const [collapsed, setCollapsed] = useState({});
   const [editing, setEditing] = useState({});
   const [editValues, setEditValues] = useState({});
@@ -13,6 +14,9 @@ const EditableJsonViewer = ({ data, onChange, level = 0 }) => {
   const [newFieldValue, setNewFieldValue] = useState({});
   const [editingFieldName, setEditingFieldName] = useState({});
   const [editFieldNameValue, setEditFieldNameValue] = useState({});
+  const [rawMode, setRawMode] = useState(false);
+  const [rawJson, setRawJson] = useState('');
+  const [jsonError, setJsonError] = useState('');
 
   const toggleCollapse = (path, e) => {
     if (e) {
@@ -680,41 +684,139 @@ const EditableJsonViewer = ({ data, onChange, level = 0 }) => {
     return <span className="text-gray-900 dark:text-gray-100">{String(value)}</span>;
   };
 
-  const handlePaste = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const pastedText = e.clipboardData.getData('text');
-      
-      // Try to parse as JSON
+  const toggleRawMode = () => {
+    if (!rawMode) {
+      // Switching to raw mode - populate textarea
+      setRawJson(JSON.stringify(data, null, 2));
+      setJsonError('');
+    } else {
+      // Switching back to visual mode - validate and save
       try {
-        const parsedData = JSON.parse(pastedText);
-        
-        // If it's an object or array, replace the entire data
-        if (typeof parsedData === 'object' && parsedData !== null) {
-          if (onChange) {
-            onChange(parsedData);
-          }
+        const parsed = JSON.parse(rawJson);
+        if (onChange) {
+          onChange(parsed);
         }
-      } catch (parseError) {
-        // If not valid JSON, ignore the paste
-        console.log('Pasted text is not valid JSON');
+        setJsonError('');
+      } catch (err) {
+        setJsonError(err.message);
+        return; // Don't switch if invalid
       }
+    }
+    setRawMode(!rawMode);
+  };
+
+  const handleRawJsonChange = (value) => {
+    setRawJson(value);
+    // Try to parse to show errors
+    try {
+      JSON.parse(value);
+      setJsonError('');
     } catch (err) {
-      console.error('Paste error:', err);
+      setJsonError(err.message);
+    }
+  };
+
+  const applyRawJson = () => {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (onChange) {
+        onChange(parsed);
+      }
+      setJsonError('');
+      setRawMode(false);
+    } catch (err) {
+      setJsonError(err.message);
     }
   };
 
   return (
-    <div 
-      className="font-mono text-sm leading-relaxed"
-      onPaste={handlePaste}
-      tabIndex={0}
-    >
-      {renderEditableValue(data, '', '')}
-      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-        💡 Tip: Paste JSON directly (Ctrl+V) to replace the entire document
-      </div>
+    <div className="relative">
+      {/* Toggle Button */}
+      {showRawEditor && (
+        <div className="absolute top-0 right-0 z-10">
+          <button
+            type="button"
+            onClick={toggleRawMode}
+            className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+            title={rawMode ? 'Switch to Visual Editor' : 'Switch to Raw JSON Editor'}
+          >
+            {rawMode ? (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Visual
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Raw JSON
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Raw JSON Editor Mode */}
+      {rawMode ? (
+        <div className="space-y-2">
+          <textarea
+            value={rawJson}
+            onChange={(e) => handleRawJsonChange(e.target.value)}
+            className="w-full h-[500px] px-4 py-3 font-mono text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            placeholder='{"field": "value"}'
+            spellCheck={false}
+          />
+          
+          {/* Error Message */}
+          {jsonError && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+              <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300">Invalid JSON</p>
+                <p className="text-xs text-red-700 dark:text-red-400 mt-1">{jsonError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              💡 Copy/paste JSON directly. Use Ctrl+A to select all, Ctrl+C to copy, Ctrl+V to paste.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRawMode(false);
+                  setJsonError('');
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyRawJson}
+                disabled={!!jsonError}
+                className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Visual Editor Mode */
+        <div className="font-mono text-sm leading-relaxed">
+          {renderEditableValue(data, '', '')}
+        </div>
+      )}
     </div>
   );
 };

@@ -15,7 +15,7 @@ import {
   CardContent,
   Input,
   Badge,
-  LoadingSkeleton,
+  CardSkeleton,
   EmptyState,
 } from '../components/ui';
 import {
@@ -259,7 +259,7 @@ const SchemaPage = () => {
         )}
 
         {/* Loading State */}
-        {loading && <LoadingSkeleton count={5} />}
+        {loading && <CardSkeleton count={2} />}
 
         {/* Schema Data */}
         {!loading && schemaData && (

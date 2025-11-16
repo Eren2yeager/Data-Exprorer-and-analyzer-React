@@ -17,7 +17,7 @@ import {
   Textarea,
   Modal,
   Badge,
-  TableSkeleton,
+  ListSkeleton,
   NoDataEmptyState,
   JsonViewer,
   EditableJsonViewer,
@@ -450,7 +450,7 @@ const DocumentsPage = () => {
         </div>
 
         {/* Loading State */}
-        {loading && <TableSkeleton count={5} />}
+        {loading && <ListSkeleton count={6} />}
 
         {/* Empty State */}
         {!loading && documents.length === 0 && !error && (

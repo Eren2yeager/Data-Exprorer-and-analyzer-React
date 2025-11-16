@@ -17,7 +17,7 @@ import {
   Input,
   Modal,
   Badge,
-  LoadingSkeleton,
+  ListSkeleton,
   EmptyState,
 } from '../components/ui';
 import CollectionNav from '../components/navigation/CollectionNav';
@@ -265,7 +265,7 @@ const IndexesPage = () => {
         )}
 
         {/* Loading State */}
-        {loading && <LoadingSkeleton count={3} />}
+        {loading && <ListSkeleton count={6} />}
 
         {/* Empty State */}
         {!loading && indexes.length === 0 && !error && (

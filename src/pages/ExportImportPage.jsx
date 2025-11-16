@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { exportImportAPI } from '../services/api';
 import { useToast } from '../../Contexts/toast-Contex';
-import { Card, Button, Input, LoadingSkeleton, EditableJsonViewer, JsonViewer } from '../components/ui';
+import { Card, Button, Input, CardSkeleton, EditableJsonViewer, JsonViewer } from '../components/ui';
 import { FiDownload, FiUpload, FiFile, FiDatabase, FiAlertCircle } from 'react-icons/fi';
 import CollectionNav from '../components/navigation/CollectionNav';
 
@@ -176,7 +176,7 @@ const ExportImportPage = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <LoadingSkeleton count={3} />
+        <CardSkeleton count={3} />
       </div>
     );
   }

@@ -24,19 +24,11 @@ export const ConnectionProvider = ({ children }) => {
       const storedConnInfo = localStorage.getItem('connectionInfo');
       
       if (storedSessionId && storedConnInfo) {
-        try {
-          const response = await connectionAPI.getSessions();
-          if (response.data.success) {
-            setIsConnected(true);
-            setSessionId(storedSessionId);
-            setConnectionInfo(JSON.parse(storedConnInfo));
-          } else {
-            clearConnection();
-          }
-        } catch (error) {
-          console.log('Session validation failed:', error.message);
-          clearConnection();
-        }
+        // Just restore from localStorage without validating
+        // The API will return 401 if session is invalid, which will trigger clearConnection
+        setIsConnected(true);
+        setSessionId(storedSessionId);
+        setConnectionInfo(JSON.parse(storedConnInfo));
       } else {
         setIsConnected(false);
         setSessionId(null);

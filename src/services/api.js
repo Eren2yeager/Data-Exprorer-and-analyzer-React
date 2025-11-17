@@ -58,7 +58,14 @@ export const connectionAPI = {
     return api.post('/connect', { connStr });
   },
 
-
+  /**
+   * Validate if session is still active
+   * @returns {Promise} - API response with validation result
+   */
+  validateSession: () => {
+    const sessionId = localStorage.getItem('mongoSessionId');
+    return api.post('/validate-session', { sessionId });
+  },
 
   /**
    * Get list of active sessions

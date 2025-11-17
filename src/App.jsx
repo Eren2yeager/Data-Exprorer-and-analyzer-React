@@ -25,6 +25,9 @@ import NotFoundPage from './pages/NotFoundPage';
 // Protected route component
 import ProtectedRoute from './components/common/ProtectedRoute';
 
+// Session management
+import SessionKeepAlive from './components/SessionKeepAlive';
+
 /**
  * Main application component
  * Sets up routing and layout structure with protected routes
@@ -37,6 +40,7 @@ function App() {
     <ConnectionProvider>
       <RefreshProvider>
         <Router>
+          <SessionKeepAlive />
           <Routes>
           {/* Connection page (outside main layout) */}
           <Route path="/" element={<ConnectionPage />} />
